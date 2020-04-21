@@ -1,4 +1,18 @@
 #NOTICE
+ESP32 for uBitx-Raduino
+Based on https://github.com/afarhan/ubitx and KD8CEC firmware (http://www.hamskey.com)
+It needs:
+- uBitx v.6 with TFT touch screen 320x240
+- ESP32 Dev kit
+- PCB adapter
+
+Some features
+- WiFi
+- Webserver
+- Config stored at files (SPIFFSS), not EEPROM
+- FTP server
+- Real Time Clock
+
 ----------------------------------------------------------------------------
 - Now Release Version 1.20 on my blog (http://www.hamskey.com)
 - You can download and compiled hex file and uBITX Manager application on release section (https://github.com/phdlee/ubitx/releases)
