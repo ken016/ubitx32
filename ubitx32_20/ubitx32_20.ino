@@ -1,0 +1,1150 @@
+ //Firmware Version
+//+ : This symbol identifies the firmware. 
+//    It was originally called 'CEC V1.072' but it is too long to waste the LCD window.
+//    I do not want to make this Firmware users's uBITX messy with my callsign.
+//    Putting one alphabet in front of 'v' has a different meaning.
+//    So I put + in the sense that it was improved one by one based on Original Firmware.
+//    This firmware hass been gradually changed based on the original firmware created by Farhan, Jack, Jerry and others.
+  
+#define FIRMWARE_VERSION_INFO F("+v32-1.200")  
+#define BITX
+
+/**
+ Cat Suppoort uBITX CEC Version 
+ This firmware has been gradually changed based on the original firmware created by Farhan, Jack, Jerry and others.
+ Most features(TX, Frequency Range, Ham Band, TX Control, CW delay, start Delay... more) have been added by KD8CEC.
+ My wish is to keep the original author's Comment as long as the meaning does not change much, even if the code looks a bit long.
+ Ian KD8CEC
+
+ Original source comment            -------------------------------------------------------------
+ * This source file is under General Public License version 3.
+ * 
+ * This verision uses a built-in Si5351 library
+ * Most source code are meant to be understood by the compilers and the computers. 
+ * Code that has to be hackable needs to be well understood and properly documented. 
+ * Donald Knuth coined the term Literate Programming to indicate code that is written be 
+ * easily read and understood.
+ * 
+ * The Raduino is a small board that includes the Arduin Nano, a 16x2 LCD display and
+ * an Si5351a frequency synthesizer. This board is manufactured by Paradigm Ecomm Pvt Ltd
+ * 
+ * To learn more about Arduino you may visit www.arduino.cc. 
+ * 
+ * The Arduino works by starts executing the code in a function called setup() and then it 
+ void 
+ * repeatedly keeps calling loop() forever. All the initialization code is kept in setup()
+ * and code to continuously sense the tuning knob, the function button, transmit/receive,
+ * etc is all in the loop() function. If you wish to study the code top down, then scroll
+ * to the bottom of this file and read your way up.
+ * 
+ * Below are the libraries to be included for building the Raduino 
+ * The EEPROM library is used to store settings like the frequency memory, caliberation data, 
+ * callsign etc .
+ *
+ *  The main chip which generates upto three oscillators of various frequencies in the
+ *  Raduino is the Si5351a. To learn more about Si5351a you can download the datasheet 
+ *  from www.silabs.com although, strictly speaking it is not a requirment to understand this code. 
+ *  Instead, you can look up the Si5351 library written by xxx, yyy. You can download and 
+ *  install it from www.url.com to complile this file.
+ *  The Wire.h library is used to talk to the Si5351 and we also declare an instance of 
+ *  Si5351 object to control the clocks.
+ */
+#include <WiFi.h>
+#include <ESP8266FtpServer.h>
+#include <WiFiUdp.h>
+#include <NTPClient.h>                // Local
+#include "Time.h"                     // Local 
+#include "TimeLib.h"                  // Localc
+#include "FS.h"
+#include "SPIFFS.h"
+#include <Wire.h>
+#include <EEPROM.h>
+#include <TFT_eSPI.h>     // Graphics and font library for ILI9341 driver chip
+TFT_eSPI tft=TFT_eSPI();  // Invoke library, pins defined in User_Setup.h
+FtpServer ftpSrv;   //set #define FTP_DEBUG in ESP8266FtpServer.h to see ftp verbose on serial
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP, "europe.pool.ntp.org");
+unsigned long countfaulttime=29999;       // veces que ha fallado la sincronización
+unsigned long tini=0;
+unsigned long mact1,mact2,mact10,mact60,mact3600,mact86400; 
+
+#include "ubitx.h"
+#include "ubitx_eemap.h"
+
+/**
+ * The uBITX is an upconnversion transceiver. The first IF is at 45 MHz.
+ * The first IF frequency is not exactly at 45 Mhz but about 5 khz lower,
+ * this shift is due to the loading on the 45 Mhz crystal filter by the matching
+ * L-network used on it's either sides.
+ * The first oscillator works between 48 Mhz and 75 MHz. The signal is subtracted
+ * from the first oscillator to arriive at 45 Mhz IF. Thus, it is inverted : LSB becomes USB
+ * and USB becomes LSB.
+ * The second IF of 12 Mhz has a ladder crystal filter. If a second oscillator is used at 
+ * 57 Mhz, the signal is subtracted FROM the oscillator, inverting a second time, and arrives 
+ * at the 12 Mhz ladder filter thus doouble inversion, keeps the sidebands as they originally were.
+ * If the second oscillator is at 33 Mhz, the oscilaltor is subtracated from the signal, 
+ * thus keeping the signal's sidebands inverted. The USB will become LSB.
+ * We use this technique to switch sidebands. This is to avoid placing the lsbCarrier close to
+ * 12 MHz where its fifth harmonic beats with the arduino's 16 Mhz oscillator's fourth harmonic
+ */
+
+// the second oscillator should ideally be at 57 MHz, however, the crystal filter's center frequency 
+// is shifted down a little due to the loading from the impedance matching L-networks on either sides
+
+//For Test  //45005000
+  //#define SECOND_OSC_USB (56064200l)
+  //#define SECOND_OSC_LSB (33945800l) 
+
+/*
+  //For Test //4500000
+  #define SECOND_OSC_USB (56059200l)
+  #define SECOND_OSC_LSB (33940800l) 
+*/
+
+/*
+  //For Test // V1.121  44991500(LSB), 44998500 (USB), abs : 7k
+  #define SECOND_OSC_USB (56057700l)
+  #define SECOND_OSC_LSB (33932300l) 
+*/
+
+  //==============================================================================================================================
+  //For Test // V1.200 V1.122  45002500 (LSB), 45002000 (USB) (Change Default BFO Frequency 11056xxx, adjust bfo and ifshift ), abs: 0.5k
+  //Best, Test 3 uBITX V5
+  //Last Value, If more data is collected, it can be changed to a better value.
+  #define SECOND_OSC_USB (56058700l)
+  #define SECOND_OSC_LSB (33945800l) 
+
+  //Not used, Just comment (Default)
+  #define INIT_USB_FREQ   (11056500l)
+  //-----------------------------------------------------------------------------------------------------------------------------
+  
+
+// limits the tuning and working range of the ubitx between 3 MHz and 30 MHz
+#define LOWEST_FREQ  (3000000l)
+#define HIGHEST_FREQ (30000000l)
+
+//When the frequency is moved by the dial, the maximum value by KD8CEC
+#define LOWEST_FREQ_DIAL  (3000l)
+#define HIGHEST_FREQ_DIAL (60000000l)
+
+int8_t meter_reading = 0; // a -1 on meter makes it invisible
+unsigned long vfoA_eeprom, vfoB_eeprom; //for protect eeprom life
+
+//for store the mode in eeprom
+// byte vfoA_mode=0, vfoB_mode = 0;          //0: default, 1:not use, 2:LSB, 3:USB, 4:CW, 5:AM, 6:FM
+byte vfoA_mode_eeprom, vfoB_mode_eeprom;  //for protect eeprom life
+
+//KD8CEC
+//for AutoSave and protect eeprom life
+byte saveIntervalSec = 10;  //second
+unsigned long saveCheckTime = 0;
+unsigned long saveCheckFreq = 0;
+
+//sideTonePitch + sideToneSub = sideTone
+byte sideTonePitch=0;
+byte sideToneSub = 0;
+
+//DialLock
+byte isDialLock = 0;  //000000[0]vfoB [0]vfoA 0Bit : A, 1Bit : B
+byte isTxType = 0;    //000000[0 - isSplit] [0 - isTXStop]
+
+
+//CW ADC Range
+int cwAdcSTFrom = 0;
+int cwAdcSTTo = 0;
+int cwAdcDotFrom = 0;
+int cwAdcDotTo = 0;
+int cwAdcDashFrom = 0;
+int cwAdcDashTo = 0;
+int cwAdcBothFrom = 0;
+int cwAdcBothTo = 0;
+bool Iambic_Key = true;
+#define IAMBICB 0x10 // 0 for Iambic A, 1 for Iambic B
+unsigned char keyerControl = IAMBICB;
+
+int shiftDisplayAdjustVal = 0;  //
+
+//Variables for auto cw mode
+byte isCWAutoMode = 0;          //0 : none, 1 : CW_AutoMode_Menu_Selection, 2 : CW_AutoMode Sending
+byte cwAutoTextCount = 0;       //cwAutoText Count
+byte beforeCWTextIndex = 255;   //when auto cw start, always beforeCWTextIndex = 255, (for first time check)
+byte cwAutoDialType = 0;        //0 : CW Text Change, 1 : Frequency Tune
+
+#define AUTO_CW_RESERVE_MAX 3
+byte autoCWSendReserv[AUTO_CW_RESERVE_MAX]; //Reserve CW Auto Send
+byte autoCWSendReservCount = 0;             //Reserve CW Text Cound
+byte sendingCWTextIndex = 0;                //cw auto seding Text Index
+
+
+/**
+ * Raduino needs to keep track of current state of the transceiver. These are a few variables that do it
+ */
+  typedef struct {    // datos configuración
+                  char splitOn = 0; //working split, uses VFO B as the transmit frequency                  byte isUSB = 0;   //upper sideband was selected, this is reset to the default for the 
+                  byte isUSB = 0;   //upper sideband was selected, this is reset to the default for the 
+                  int cwMode = 0;   //compatible original source, and extend mode //if cwMode == 0, mode check : isUSB, cwMode > 0, mode Check : cwMode
+                                    //iscwMode = 0 : ssbmode, 1 :cwl, 2 : cwu, 3 : cwn (none tx)
+                  unsigned long cwTimeout = 0;    //milliseconds to go before the cw transmit line is released and the radio goes back to rx mode
+                  byte ritOn = 0;
+                  boolean modeCalibrate = false;  //this mode of menus shows extended menus to calibrate the oscillators and choose the proper
+                                                  //beat frequency
+                  byte advancedFreqOption1;     //255 : Bit0: use IFTune_Value, Bit1 : use Stored enabled SDR Mode, Bit2~Bit3 : dynamic sdr frequency,  bit 7: IFTune_Value Reverse for DIY uBITX
+                  byte attLevel = 0;            //ATT : RF Gain Control (Receive) <-- IF1 Shift, 0 : Off, ShiftValue is attLevel * 100; attLevel 150 = 15K
+                  byte if1TuneValue = 0;        //0 : OFF, IF1 + if1TuneValue * 100; // + - 12500;
+                  byte sdrModeOn = 0;           //SDR MODE ON / OFF
+                  unsigned long SDR_Center_Freq; //
+                  int32_t calibration = 0;
+                  byte vfoActive = VFO_A;
+                  byte vfoA_mode = 0;          //0: default, 1:not use, 2:LSB, 3:USB, 4:CW, 5:AM, 6:FM
+                  byte vfoB_mode = 0;          //0: default, 1:not use, 2:LSB, 3:USB, 4:CW, 5:AM, 6:FM
+                  unsigned int cwSpeed = 100; //this is actuall the dot period in milliseconds
+                  unsigned long vfoA=7150000L;
+                  unsigned long vfoB=14200000L;
+                  unsigned long sideTone=800;
+                  unsigned long usbCarrier;
+                  unsigned long cwmCarrier;
+                  byte cwDelayTime = 60;
+                  byte delayBeforeCWStartTime = 50;
+                  uint8_t SI5351BX_ADDR=0x60;        // I2C address of Si5351   (variable from Version 1.097)
+                  byte cwKeyType = 0; //0: straight, 1 : iambica, 2: iambicb
+                  byte tuneStepIndex; //default Value 0, start Offset is 0 because of check new user
+                  byte commonOption0 = 0;   //0: Confirm : CW Frequency Shift,  1 : IF Shift Save
+                  byte displayOption1 = 0;
+                  byte displayOption2 = 0;
+                  byte useHamBandCount = 0;  //0 use full range frequency
+                  byte tuneTXType = 0;   //0 : use full range, 1 : just Change Dial speed, 2 : just ham band change, but can general band by tune, 3 : only ham band (just support 0, 2 (0.26 version))
+                                         //100 : use full range but not TX on general band, 101 : just change dial speed but.. 2 : jut... but.. 3 : only ham band  (just support 100, 102 (0.26 version))
+                  byte isShiftDisplayCWFreq = 1;  //Display Frequency 
+                  unsigned int hamBandRange[MAX_LIMIT_RANGE][2]=    // =  //Khz because reduce use memory
+                              {{1810,2000},{3500,3800},{5351,5367},{7000,7300},{10100,10150},
+                               {14000,14350},{18068,18168},{21000,21450},{24890,24999},{28000,29700}};
+                  long arTuneStep[5]={10,50,100,500,1000};
+                  int ifShiftValue = 0;   //
+                  byte sMeterLevels[9];
+                  byte KeyValues[16][3];
+                  byte userCallsignLength = 0;    //7 : display callsign at system startup, 6~0 : callsign length (range : 1~18)
+                  byte WsprMSGCount = 0;
+                  unsigned long frequency;  //frequency is the current frequency on the dial
+                  unsigned long ritRxFrequency;  
+                  unsigned long ritTxFrequency;  
+                  byte scaledSMeter = 0;
+                  byte wifimode=2;    // default AP+STA
+                  byte canalAP=3;      // 1 byte, canal ESP en modo AP
+                  char ssidSTA[20]="elconuco";       // 20 bytes, SSID en modo STA
+                  char passSTA[20]="18921892";       // 20 bytes, Password en modo STA
+                  char ssidAP[20]="UBITX";     // 20 bytes, SSID en modo AP
+                  char passAP[20]="12341234";       // 20 bytes, Password en modo AP
+                  IPAddress EEip={192,168,1,149};   // 4 bytes, dirección IP
+                  IPAddress EEgw={192,168,1,1};     // 4 bytes, puerta de enlace
+                  IPAddress EEmask={255,255,255,0}; // 4 bytes, máscara de subred
+                  IPAddress EEdns={8,8,8,8};        // 4 bytes, servidor DNS primario
+                  IPAddress EEdns2={8,8,4,4};       // 4 bytes, servidor DNS secundario
+                  byte staticIP=1;                  // 1 byte, IP estática Sí/No
+                  boolean ftpenable=true;
+} conftype;
+    conftype conf;
+    byte *buffconf = (byte *) &conf; // acceder a conf como bytes
+
+void showconf()
+{
+  Serial2.print("splitOn:"); Serial2.println(conf.splitOn);
+  Serial2.print("isUSB:"); Serial2.println(conf.isUSB);
+  Serial2.print("cwMode:"); Serial2.println(conf.cwMode);
+  Serial2.print("splitOn:"); Serial2.println(conf.splitOn);
+  Serial2.print("splitOn::"); Serial2.println(conf.splitOn);
+  Serial2.print("splitOn:"); Serial2.println(conf.splitOn);
+  Serial2.print("splitOn:"); Serial2.println(conf.splitOn);
+  Serial2.print("splitOn:"); Serial2.println(conf.splitOn);
+  Serial2.print("splitOn:"); Serial2.println(conf.splitOn);
+}
+
+
+boolean txCAT = false;        //turned on if the transmitting due to a CAT command
+byte inTx = 0;                //it is set to 1 if in transmit mode (whatever the reason : cw, ptt or cat)
+char keyDown = 0;             //in cw mode, denotes the carrier is being transmitted
+byte menuOn = 0;              //set to 1 when the menu is being displayed, if a menu item sets it to zero, the menu is exited
+                             
+//byte advancedFreqOption1;     //255 : Bit0: use IFTune_Value, Bit1 : use Stored enabled SDR Mode, Bit2~Bit3 : dynamic sdr frequency,  bit 7: IFTune_Value Reverse for DIY uBITX
+//byte attLevel = 0;            //ATT : RF Gain Control (Receive) <-- IF1 Shift, 0 : Off, ShiftValue is attLevel * 100; attLevel 150 = 15K
+//byte if1TuneValue = 0;        //0 : OFF, IF1 + if1TuneValue * 100; // + - 12500;
+//byte sdrModeOn = 0;           //SDR MODE ON / OFF
+//unsigned long SDR_Center_Freq; //
+
+unsigned long beforeIdle_ProcessTime = 0; //for check Idle time
+byte line2DisplayStatus = 0;  //0:Clear, 1 : menu, 1: DisplayFrom Idle, 
+char lcdMeter[17];
+
+//Current ADC Value for S.Meter, and S Meter Level
+int currentSMeter = 0;
+byte isIFShift = 0;     //1 = ifShift, 2 extend
+
+//Use Custom Filter
+char isCustomFilter = 0;
+char isCustomFilter_A7 = 0;
+char CustFilters[7][2];
+                              
+/* Below are the basic functions that control the uBitx. Understanding the functions before 
+ * you start hacking around */
+
+//-1 : not found, 0 ~ 9 : Hamband index
+byte getIndexHambanBbyFreq(unsigned long f)
+{
+  f = f / 1000;
+  for (byte i = 0; i < conf.useHamBandCount; i++)
+    if (conf.hamBandRange[i][0] <= f && f < conf.hamBandRange[i][1])
+      return i;
+  return -1;
+}
+
+// when Band change step = just hamband,  moveDirection : 1 = next, -1 : prior
+void setNextHamBandFreq(unsigned long f, int moveDirection)
+{
+  unsigned long resultFreq = 0;
+  byte loadMode = 0;
+  byte findedIndex = getIndexHambanBbyFreq(f);
+  Serial2.print("act:");Serial2.print(findedIndex);
+  if (findedIndex == -1) {  //out of hamband
+    findedIndex=3;
+    }
+  else if (moveDirection==1)
+    {
+    if (findedIndex < conf.useHamBandCount-1)
+      findedIndex++;
+    else
+      findedIndex=0;
+    }
+  else if (moveDirection==-1)
+    {
+    if (findedIndex > 0)
+      findedIndex--;
+    else
+      findedIndex=conf.useHamBandCount-1;
+    }
+  else
+    findedIndex = -1;
+ 
+  //loadMode = (byte)(resultFreq >> 30);
+  //resultFreq = resultFreq & 0x3FFFFFFF;
+  loadMode = (byte)(resultFreq >> 29);
+  resultFreq = resultFreq & 0x1FFFFFFF;
+  
+  if ((resultFreq / 1000) < conf.hamBandRange[(unsigned char)findedIndex][0] || (resultFreq / 1000) > conf.hamBandRange[(unsigned char)findedIndex][1])
+    resultFreq = (unsigned long)(conf.hamBandRange[(unsigned char)findedIndex][0]) * 1000;
+
+  byteToMode(loadMode, 1);
+  setFrequency(resultFreq);
+}
+
+void saveBandFreqByIndex(unsigned long f, unsigned long mode, char bandIndex) {
+  if (bandIndex >= 0)
+    saveconf();
+}
+
+/*KD8CEC
+  When using the basic delay of the Arduino, the program freezes.
+  When the delay is used, the program will generate an error because it is not communicating, 
+  so Create a new delay function that can do background processing. */
+unsigned long delayBeforeTime = 0;
+byte delay_background(unsigned delayTime, byte fromType){ //fromType : 4 autoCWKey -> Check Paddle
+  delayBeforeTime = millis();
+  while (millis() - delayBeforeTime <= delayTime) {
+    if (fromType == 4)
+    {
+      //CHECK PADDLE
+      if (getPaddle() != 0) //Interrupt : Stop cw Auto mode by Paddle -> Change Auto to Manual
+        return 1;
+      //Check PTT while auto Sending
+      autoSendPTTCheck();
+      Check_Cat(3);
+    }
+    else
+      {
+      //Background Work      
+      Check_Cat(fromType);
+      }
+  }
+
+  return 0;
+}
+ 
+
+/**
+ * Select the properly tx harmonic filters
+ * The four harmonic filters use only three relays
+ * the four LPFs cover 30-21 Mhz, 18 - 14 Mhz, 7-10 MHz and 3.5 to 5 Mhz
+ * Briefly, it works like this, 
+ * - When KT1 is OFF, the 'off' position routes the PA output through the 30 MHz LPF
+ * - When KT1 is ON, it routes the PA output to KT2. Which is why you will see that
+ *   the KT1 is on for the three other cases.
+ * - When the KT1 is ON and KT2 is off, the off position of KT2 routes the PA output
+ *   to 18 MHz LPF (That also works for 14 Mhz) 
+ * - When KT1 is On, KT2 is On, it routes the PA output to KT3
+ * - KT3, when switched on selects the 7-10 Mhz filter
+ * - KT3 when switched off selects the 3.5-5 Mhz filter
+ * See the circuit to understand this
+ */
+
+void setTXFilters(unsigned long freq){
+  
+    if (freq > 21000000L){  // the default filter is with 35 MHz cut-off
+      digitalWrite(TX_LPF_A, 0);
+      digitalWrite(TX_LPF_B, 0);
+      digitalWrite(TX_LPF_C, 0);
+    }
+    else if (freq >= 14000000L){ //thrown the KT1 relay on, the 30 MHz LPF is bypassed and the 14-18 MHz LPF is allowd to go through
+      digitalWrite(TX_LPF_A, 1);
+      digitalWrite(TX_LPF_B, 0);
+      digitalWrite(TX_LPF_C, 0);
+    }
+    else if (freq > 7000000L){
+      digitalWrite(TX_LPF_A, 0);
+      digitalWrite(TX_LPF_B, 1);
+      digitalWrite(TX_LPF_C, 0);    
+    }
+    else {
+      digitalWrite(TX_LPF_A, 0);
+      digitalWrite(TX_LPF_B, 0);
+      digitalWrite(TX_LPF_C, 1);    
+    }
+}
+
+/* This is the most frequently called function that configures the 
+ * radio to a particular frequeny, sideband and sets up the transmit filters
+ * The transmit filter relays are powered up only during the tx so they dont
+ * draw any current during rx. 
+ * The carrier oscillator of the detector/modulator is permanently fixed at
+ * uppper sideband. The sideband selection is done by placing the second oscillator
+ * either 12 Mhz below or above the 45 Mhz signal thereby inverting the sidebands 
+ * through mixing of the second local oscillator. */
+ 
+void setFrequency(unsigned long f){
+  f = (f / conf.arTuneStep[conf.tuneStepIndex -1]) * conf.arTuneStep[conf.tuneStepIndex -1];
+  setTXFilters(f);
+  unsigned long appliedCarrier = ((conf.cwMode == 0 ? conf.usbCarrier : conf.cwmCarrier) + (isIFShift && (inTx == 0) ? conf.ifShiftValue : 0));
+  int appliedTuneValue = 0;
+  //applied if tune 
+  //byte advancedFreqOption1;     //255 : Bit0: use IFTune_Value, Bit1 : use Stored enabled SDR Mode, Bit2 : dynamic sdr frequency0, Bit3 : dynamic sdr frequency1, bit 7: IFTune_Value Reverse for DIY uBITX
+  if ((conf .advancedFreqOption1 & 0x01) != 0x00)
+    {
+    appliedTuneValue = conf .if1TuneValue;
+    //In the LSB state, the optimum reception value was found. To apply to USB, 3Khz decrease is required.
+    if (conf.sdrModeOn && (inTx == 0))
+      appliedTuneValue -= 15; //decrease 1.55Khz
+    //if (isUSB)
+    if (conf.cwMode == 2 || (conf.cwMode == 0 && (conf.isUSB)))    
+      appliedTuneValue -= 30; //decrease 3Khz
+    }
+
+   //if1Tune RX, TX Enabled, ATT : only RX Mode
+   //The IF Tune shall be measured at the LSB. Then, move the 3Khz down for USB.
+  long if1AdjustValue = ((inTx == 0) ? (conf.attLevel * 100) : 0) + (appliedTuneValue * 100); //if1Tune RX, TX Enabled, ATT : only RX Mode  //5600
+
+  //for DIY uBITX (custom filter)
+  if ((conf.advancedFreqOption1 & 0x80) != 0x00)  //Reverse IF Tune (- Value for DIY uBITX)
+    if1AdjustValue *= -1;
+  if (conf.sdrModeOn && (inTx == 0))  //IF SDR MODE
+    {
+    Serial2.println("sdrModeOn");  
+    //Fixed Frequency SDR (Default Frequency : 32Mhz, available change sdr Frequency by uBITX Manager)
+    //Dynamic Frequency is for SWL without cat
+
+    //byte advancedFreqOption1;     //255 : Bit0: use IFTune_Value, Bit1 : use Stored enabled SDR Mode, Bit2 : dynamic sdr frequency0, Bit3 : dynamic sdr frequency1, bit 7: IFTune_Value Reverse for DIY uBITX
+    long moveFrequency = 0;
+    //7 6 5 4 3 2 1 0
+    //        _ _     <-- SDR Freuqncy Option
+    byte sdrOption = (conf.advancedFreqOption1 >> 2) & 0x03;
+
+    if (sdrOption == 1) // SDR Frequency + frequenc
+      {
+      //example : offset Freq : 20 Mhz and frequency = 7.080 => 27.080 Mhz
+      //example : offset Freq : 0 Mhz and frequency = 7.080 => 7.080 Mhz
+      //for available HF, SDR
+      moveFrequency = f;
+      }
+    else if (sdrOption == 2)  //Mhz move
+      {
+      //Offset Frequency + Mhz, 
+      //Example : Offset Frequency : 30Mhz and current Frequncy is 7.080 => 37.080Mhz
+      //          Offset Frequency : 30Mhz and current Frequncy is 14.074 => 34.074Mhz
+      moveFrequency = (f % 10000000);
+      }
+    else if (sdrOption == 3)  //Khz move
+      {
+      //Offset Frequency + Khz, 
+      //Example : Offset Frequency : 30Mhz and current Frequncy is 7.080 => 30.080Mhz
+      //          Offset Frequency : 30Mhz and current Frequncy is 14.074 => 30.074Mhz
+      moveFrequency = (f % 1000000);
+      }
+
+    si5351bx_setfreq(2, 45002000 + if1AdjustValue + f);
+    si5351bx_setfreq(1, 45002000 
+      + if1AdjustValue 
+      + conf.SDR_Center_Freq 
+      //+ ((advancedFreqOption1 & 0x04) == 0x00 ? 0 : (f % 10000000))
+      + moveFrequency);
+      // + 2390);  //RTL-SDR Frequency Error, Do not add another SDR because the error is different. V1.3
+    }
+  else
+    {
+    Serial2.print("cwMode/isUSB:");  Serial2.print(conf.cwMode); Serial2.print("/");  Serial2.println(conf.isUSB);  
+    Serial2.print("SECOND_OSC_LSB/if1AdjustValue/appliedCarrier/f:"); 
+    Serial2.print(SECOND_OSC_LSB); Serial2.print("/");  
+    Serial2.print(if1AdjustValue);  Serial2.print("/");  
+    Serial2.print(appliedCarrier); Serial2.print("/");   
+    Serial2.println(f);  
+    if1AdjustValue=7000;
+    if (conf.cwMode == 1 || (conf.cwMode == 0 && (!conf.isUSB))) //cwl or lsb
+      {
+      //CWL(cwMode == 1) or LSB (cwMode == 0 && (!isUSB))
+      Serial2.print("clk2/clk1:");  Serial2.print(SECOND_OSC_LSB + if1AdjustValue + appliedCarrier + f); 
+      Serial2.print("/");  Serial2.println(SECOND_OSC_LSB + if1AdjustValue);  
+      si5351bx_setfreq(2, SECOND_OSC_LSB + if1AdjustValue + appliedCarrier + f);
+      si5351bx_setfreq(1, SECOND_OSC_LSB + if1AdjustValue);
+      }
+    else  //cwu or usb
+      {
+      //CWU (cwMode == 2) or USB (cwMode == 0 and isUSB)
+      Serial2.print("clk2/clk1:");  Serial2.print(SECOND_OSC_USB + if1AdjustValue - appliedCarrier + f); 
+      Serial2.print("/");  Serial2.println(SECOND_OSC_USB + if1AdjustValue);  
+      si5351bx_setfreq(2, SECOND_OSC_USB + if1AdjustValue - appliedCarrier + f);
+      si5351bx_setfreq(1, SECOND_OSC_USB + if1AdjustValue);
+      }
+    }
+  conf.frequency = f;
+}
+
+/* startTx is called by the PTT, cw keyer and CAT protocol to
+ * put the uBitx in tx mode. It takes care of rit settings, sideband settings
+ * Note: In cw mode, doesnt key the radio, only puts it in tx mode */
+void startTx(byte txMode, byte isDisplayUpdate){
+  //Check Hamband only TX //Not found Hamband index by now frequency
+  if (conf.tuneTXType >= 100 && getIndexHambanBbyFreq(conf.ritOn ? conf.ritTxFrequency :  conf.frequency) == -1) {
+    //no message
+    return;
+    }
+  if ((isTxType & 0x01) != 0x01)
+    digitalWrite(TX_RX, 1);
+  inTx = 1;
+  
+  if (conf.ritOn){
+    //save the current as the rx frequency
+    conf.ritRxFrequency = conf.frequency;
+    setFrequency(conf.ritTxFrequency);
+    }
+  else 
+    {
+    if (conf.splitOn == 1) 
+      {
+      FrequencyToVFO(1);  //Save current Frequency and Mode to eeprom
+      if (conf.vfoActive == VFO_B) 
+        {
+        conf.vfoActive = VFO_A;
+        conf.frequency = conf.vfoA;
+        byteToMode(conf.vfoA_mode, 0);
+        }
+      else if (conf.vfoActive == VFO_A)
+        {
+        conf.vfoActive = VFO_B;
+        conf.frequency = conf.vfoB;
+        byteToMode(conf.vfoB_mode, 0);
+        }
+      }
+
+    setFrequency(conf.frequency);
+    } //end of else
+
+  SetCarrierFreq();
+
+  if (txMode == TX_CW){
+    //turn off the second local oscillator and the bfo
+    si5351bx_setfreq(0, 0);
+    si5351bx_setfreq(1, 0);
+
+    //shif the first oscillator to the tx frequency directly
+    //the key up and key down will toggle the carrier unbalancing
+    //the exact cw frequency is the tuned frequency + sidetone
+
+    if (conf.cwMode == 0)
+      {
+      if (conf.isUSB)
+        si5351bx_setfreq(2, conf.frequency + conf.sideTone);
+      else
+        si5351bx_setfreq(2, conf.frequency - conf.sideTone); 
+      }
+    else if (conf.cwMode == 1) //CWL
+      {
+      si5351bx_setfreq(2, conf.frequency - conf.sideTone); 
+      }
+    else  //CWU
+      {
+      si5351bx_setfreq(2, conf.frequency + conf.sideTone);
+      }
+  }
+  //reduce latency time when begin of CW mode
+  if (isDisplayUpdate == 1)
+    updateDisplay(true,false);
+}
+
+void stopTx(void){
+  inTx = 0;
+  digitalWrite(TX_RX, 0);           //turn off the tx
+  SetCarrierFreq();
+  if (conf.ritOn)
+    setFrequency(conf.ritRxFrequency);
+  else
+    {
+    if (conf.splitOn == 1) {
+      //vfo Change
+      if (conf.vfoActive == VFO_B){
+        conf.vfoActive = VFO_A;
+        conf.frequency = conf.vfoA;
+        byteToMode(conf.vfoA_mode, 0);
+        }
+      else if (conf.vfoActive == VFO_A){
+        conf.vfoActive = VFO_B;
+        conf.frequency = conf.vfoB;
+        byteToMode(conf.vfoB_mode, 0);
+        }
+    }
+    setFrequency(conf.frequency);
+    } //end of else
+  updateDisplay(true,false);
+}
+
+void ritEnable(unsigned long f){
+  conf.ritOn = 1;
+  conf.ritTxFrequency = f;
+}
+
+void ritDisable(){
+  if (conf.ritOn){
+    conf.ritOn = 0;
+    setFrequency(conf.ritTxFrequency);
+    updateDisplay(true,false);
+  }
+}
+
+/** Basic User Interface Routines. These check the front panel for any activity */
+
+/**
+ * The PTT is checked only if we are not already in a cw transmit session
+ * If the PTT is pressed, we shift to the ritbase if the rit was on
+ * flip the T/R line to T and update the display to denote transmission */
+
+void checkPTT(){  
+  //we don't check for ptt when transmitting cw
+  if (conf.cwTimeout > 0) return;
+  if (digitalRead(PTT) == 0 && inTx == 0){
+    startTx(TX_SSB, 1);  
+    delay(50); //debounce the PTT
+    }
+  if (digitalRead(PTT) == 1 && inTx == 1)
+    {
+    stopTx(); 
+    }
+}
+
+void checkButton(){
+ byte currentBandIndex = -1;
+  
+ //only if the button is pressed
+ int keyStatus = getBtnStatus();
+ if (keyStatus == -1) return;
+// delay(50);
+
+ keyStatus = getBtnStatus();   //will be remove 3 lines
+ if (keyStatus == -1) return;
+ if (keyStatus == FKEY_PRESS)  //Menu Key
+   {
+    //for touch screen
+   doMenu();
+   }
+  //wait for the button to go up again
+  // while(keyStatus == getBtnStatus()) { delay(10); Check_Cat(0);  }
+  Check_Cat(0);
+  //delay(50);//debounce
+}
+
+/************************************
+Replace function by KD8CEC
+prevent error controls applied Threshold for reduct errors,  dial Lock, dynamic Step
+ *************************************/
+byte threshold = 2;  //noe action for count
+unsigned long lastEncInputtime = 0;
+int encodedSumValue = 0;
+unsigned long lastTunetime = 0; //if continous moving, skip threshold processing
+byte lastMovedirection = 0;     //0 : stop, 1 : cw, 2 : ccw
+#define encodeTimeOut 1000
+   
+void doTuningWithThresHold(){
+  int s = 0;
+  unsigned long prev_freq;
+  if ((conf.vfoActive == VFO_A && ((isDialLock & 0x01) == 0x01)) ||
+    (conf.vfoActive == VFO_B && ((isDialLock & 0x02) == 0x02)))
+    return;
+  s = enc_read();
+  //if time is exceeded, it is recognized as an error,
+  //ignore exists values, because of errors
+  if (s == 0) {
+    if (encodedSumValue != 0 && (millis() - encodeTimeOut) > lastEncInputtime)
+      encodedSumValue = 0;
+    lastMovedirection = 0;
+    return;
+    }
+  lastEncInputtime = millis();
+  //for check moving direction
+  encodedSumValue += (s > 0 ? 1 : -1);
+  //check threshold and operator actions (hold dial speed = continous moving, skip threshold check)
+  //not use continues changing by Threshold
+  //if ((lastTunetime < (millis() - skipThresholdTime)) && ((encodedSumValue *  encodedSumValue) <= (threshold * threshold)))
+  if (((encodedSumValue *  encodedSumValue) <= (threshold * threshold)))
+    return;
+  lastTunetime = millis();
+  //Valid Action without noise
+  encodedSumValue = 0;
+  prev_freq = conf.frequency;
+  conf.frequency += (conf.arTuneStep[conf.tuneStepIndex -1] * s);  //appield weight (s is speed) //if want need more increase size, change step size
+   
+  if (prev_freq < 10000000l && conf.frequency > 10000000l)
+    conf.isUSB = true;
+  if (prev_freq > 10000000l && conf.frequency < 10000000l)
+    conf.isUSB = false;
+  setFrequency(conf.frequency);
+  updateDisplay(true,true);
+}
+
+/* RIT only steps back and forth by 100 hz at a time */
+void doRIT(){
+  int knob = enc_read();
+  unsigned long old_freq = conf.frequency;
+
+  if (knob < 0) conf.frequency -= (conf.arTuneStep[conf.tuneStepIndex -1]);  
+  else if (knob > 0) conf.frequency += (conf.arTuneStep[conf.tuneStepIndex -1]);  
+ 
+  if (old_freq != conf.frequency){
+    setFrequency(conf.frequency);
+    updateDisplay(true,false);
+    }
+}
+
+/* save Frequency and mode to eeprom for Auto Save with protected eeprom cycle, by kd8cec */
+void storeFrequencyAndMode(byte saveType)
+{
+  //freqType : 0 Both (vfoA and vfoB), 1 : vfoA, 2 : vfoB
+  if (saveType == 0 || saveType == 1) //vfoA
+    {
+      if (conf.vfoA != vfoA_eeprom) {
+        saveconf();
+        vfoA_eeprom = conf.vfoA;
+        }
+      
+      if (conf.vfoA_mode != vfoA_mode_eeprom) {
+        saveconf();
+        vfoA_mode_eeprom = conf.vfoA_mode;
+        }
+    }
+  
+  if (saveType == 0 || saveType == 2) //vfoB
+      {
+      if (conf.vfoB != vfoB_eeprom) {
+        saveconf();
+        vfoB_eeprom = conf.vfoB;
+        }
+      
+      if (conf.vfoB_mode != vfoB_mode_eeprom) {
+          saveconf();
+          vfoB_mode_eeprom = conf.vfoB_mode;
+          }
+      }
+}
+
+//calculate step size from 1 byte, compatible uBITX Manager, by KD8CEC
+unsigned int byteToSteps(byte srcByte) {
+    byte powerVal = (byte)(srcByte >> 6);
+    unsigned int baseVal = srcByte & 0x3F;
+
+    if (powerVal == 1)      return baseVal * 10;
+    else if (powerVal == 2) return baseVal * 100;
+    else if (powerVal == 3) return baseVal * 1000;
+    else                    return baseVal;
+}
+
+/* The settings are read from EEPROM. The first time around, the values may not be 
+ * present or out of range, in this case, some intelligent defaults are copied into the 
+ * variables. */
+void initSettings(){
+  //----------------------------------------------------------------
+  //Add Lines by KD8CEC
+  //for custom source Section =============================
+  //ID & Version Check from EEProm 
+  //if found different firmware, erase eeprom (32
+
+//  saveconf();
+  readconf();
+  
+  if (conf.cwKeyType == 0) Iambic_Key = false;
+  else    {
+    Iambic_Key = true;
+    if (conf.cwKeyType == 1) keyerControl &= ~IAMBICB; else keyerControl |= IAMBICB;   }
+
+  byte findedValidValueCount = 0;
+    
+  //Check Value Range and default Set for new users
+  if ((3 < conf.tuneTXType && conf.tuneTXType < 100) || 103 < conf.tuneTXType || conf.useHamBandCount < 1 || findedValidValueCount < 5)
+    {
+    conf.tuneTXType = 2;
+    //if empty band Information, auto insert default region 2 frequency range
+    //This part is made temporary for people who have difficulty setting up, so can remove it when you run out of memory.
+    conf.useHamBandCount = 10;
+    }
+  
+  if (conf.tuneStepIndex == 0) conf.tuneStepIndex = 3; //New User
+
+  //CW Key ADC Range ======= adjust set value for reduce cw keying error
+  //by KD8CEC
+  unsigned int tmpMostBits = 0;
+  tmpMostBits = EEPROM.read(CW_ADC_MOST_BIT1);
+  cwAdcSTFrom = EEPROM.read(CW_ADC_ST_FROM)   | ((tmpMostBits & 0x03) << 8);
+  cwAdcSTTo = EEPROM.read(CW_ADC_ST_TO)       | ((tmpMostBits & 0x0C) << 6);
+  cwAdcDotFrom = EEPROM.read(CW_ADC_DOT_FROM) | ((tmpMostBits & 0x30) << 4);
+  cwAdcDotTo = EEPROM.read(CW_ADC_DOT_TO)     | ((tmpMostBits & 0xC0) << 2);
+  
+  tmpMostBits = EEPROM.read(CW_ADC_MOST_BIT2);
+  cwAdcDashFrom = EEPROM.read(CW_ADC_DASH_FROM) | ((tmpMostBits & 0x03) << 8);
+  cwAdcDashTo = EEPROM.read(CW_ADC_DASH_TO)     | ((tmpMostBits & 0x0C) << 6);
+  cwAdcBothFrom = EEPROM.read(CW_ADC_BOTH_FROM) | ((tmpMostBits & 0x30) << 4);
+  cwAdcBothTo = EEPROM.read(CW_ADC_BOTH_TO)     | ((tmpMostBits & 0xC0) << 2);
+
+  //Enable / Diable Check for CW Display Cofiguration Group 
+  if ((conf.commonOption0 & 0x80) != 0x00)
+    {
+    //Adjust CW Mode Freq
+    shiftDisplayAdjustVal = (conf.isShiftDisplayCWFreq & 0x3F) * 10;
+    //check Minus
+    if ((conf.isShiftDisplayCWFreq & 0x40) == 0x40)
+      shiftDisplayAdjustVal = shiftDisplayAdjustVal * -1;
+ 
+   //Shift Display Check (Default : 0)
+    conf.isShiftDisplayCWFreq = conf.isShiftDisplayCWFreq & 0x80 == 0?1:0;
+    }
+
+   //Stored IF Shift Option
+  if ((conf.commonOption0 & 0x40) != 0x00)
+    {
+    isIFShift = conf.ifShiftValue != 0;
+    }
+
+  //default Value (for original hardware)
+  if (cwAdcSTFrom >= cwAdcSTTo)
+    {
+    cwAdcSTFrom = 0;
+    cwAdcSTTo = 50;
+    }
+
+  if (cwAdcBothFrom >= cwAdcBothTo)
+  {
+    cwAdcBothFrom = 51;
+    cwAdcBothTo = 300;
+    }
+  
+  if (cwAdcDotFrom >= cwAdcDotTo)
+    {
+    cwAdcDotFrom = 301;
+    cwAdcDotTo = 600;
+    }
+  if (cwAdcDashFrom >= cwAdcDashTo)
+    {
+    cwAdcDashFrom = 601;
+    cwAdcDashTo = 800;
+    }
+  //end of CW Keying Variables
+  
+  if (conf.cwDelayTime < 1 || conf.cwDelayTime > 250)  conf.cwDelayTime = 60;
+
+  if (conf.vfoA_mode < 2)conf.vfoA_mode = 2;
+  if (conf.vfoB_mode < 2) conf.vfoB_mode = 3;
+
+  //original code with modified by kd8cec
+  if (conf.usbCarrier > 11060000l || conf.usbCarrier < 11048000l)
+//    usbCarrier = 11052000l;   //EA4GZI
+    conf.usbCarrier = 11059000l;   //EA4GZI
+
+  if (conf.cwmCarrier > 11060000l || conf.cwmCarrier < 11048000l)
+    conf.cwmCarrier = 11052000l;
+    
+  if (conf.vfoA > 35000000l || 3500000l > conf.vfoA) {
+     conf.vfoA = 7150000l;
+     conf.vfoA_mode = 2; //LSB
+    }
+  
+  if (conf.vfoB > 35000000l || 3500000l > conf.vfoB) {
+    conf.vfoB = 14150000l;  
+    conf.vfoB_mode = 3; //USB
+    }
+  //end of original code section
+
+  //for protect eeprom life by KD8CEC
+  vfoA_eeprom = conf.vfoA;
+  vfoB_eeprom = conf.vfoB;
+  vfoA_mode_eeprom = conf.vfoA_mode;
+  vfoB_mode_eeprom = conf.vfoB_mode;
+
+  if (conf.sideTone < 100 || 2000 < conf.sideTone) conf.sideTone = 800;
+  if (conf.cwSpeed < 10 || 1000 < conf.cwSpeed) conf.cwSpeed = 100;
+
+  if (conf.sideTone < 300 || conf.sideTone > 1000) {
+    sideTonePitch = 0;
+    sideToneSub = 0;;
+    }
+  else{
+    sideTonePitch = (conf.sideTone - 300) / 50;
+    sideToneSub = conf.sideTone % 50;
+    }
+  initButtons();
+}
+
+void initPorts(){
+  // analogReference(DEFAULT);   //EA4GZI no existe en ESP32
+  //??
+  pinMode(ENC_A, INPUT_PULLUP);   // en ESP32 necesita pullup externo
+  pinMode(ENC_B, INPUT_PULLUP);   // en ESP32 necesita pullup externo
+  pinMode(FBUTTON, INPUT_PULLUP); // en ESP32 necesita pullup externo
+  
+  pinMode(PTT, INPUT_PULLUP);
+  pinMode(ANALOG_KEYER, INPUT_PULLUP);
+  pinMode(ANALOG_SMETER, INPUT); //by KD8CEC
+
+//  pinMode(CW_TONE, OUTPUT);  // el 6 y 7 no puede usarse en el ESP32 con WiFi
+//  digitalWrite(CW_TONE, 0);
+//  pinMode(TX_RX,OUTPUT);     // el 6 y 7 no puede usarse en el ESP32 con WiFi
+//  digitalWrite(TX_RX, 0);
+  pinMode(TX_LPF_A, OUTPUT);
+  pinMode(TX_LPF_B, OUTPUT);
+  pinMode(TX_LPF_C, OUTPUT);
+  digitalWrite(TX_LPF_A, 0);
+  digitalWrite(TX_LPF_B, 0);
+  digitalWrite(TX_LPF_C, 0);
+
+  pinMode(CW_KEY, OUTPUT);
+  digitalWrite(CW_KEY, 0);
+}
+
+//Recovery Factory Setting Values 
+void factory_Recovery()
+{
+  if (digitalRead(PTT) == 0)  //Do not proceed if PTT is pressed to prevent malfunction.
+    return;
+  printLineF(0,F("Factory Recovery"));
+  delay(2000);
+  if (!btnDown())
+    return;
+
+  printLineF(0,F("IF you continue"));
+  printLineF(1,F("release the key"));
+  delay(2000);
+  if (btnDown())
+    return;
+  
+  printLineF(1,F("Press Key PTT"));
+  delay(2000);
+  if (digitalRead(PTT) == 0)
+    {
+    printLineF(1,F("Power Reset!"));
+    while(1);   //Hold 
+    }
+}
+
+void initWiFi() {
+  if(conf.wifimode>2) { conf.wifimode=2; }
+  if(conf.wifimode==0) { WiFi.mode(WIFI_STA); }
+  else if(conf.wifimode==1) { WiFi.mode(WIFI_AP); }
+  else if(conf.wifimode==2) { WiFi.mode(WIFI_AP_STA); }
+
+  WiFi.setAutoConnect(true);
+  WiFi.setAutoReconnect(true);
+  Serial2.print("WiFiMode:"); Serial2.println(conf.wifimode);
+  Serial2.print("AP MAC:"); Serial2.println(WiFi.softAPmacAddress());
+ 
+  if((conf.wifimode==1) || (conf.wifimode==2) || (conf.wifimode==12)) { // AP o AP+STA
+    WiFi.channel(conf.canalAP);
+    WiFi.softAP(conf.ssidAP, conf.passAP, conf.canalAP, false);
+    Serial2.print("Canal:");Serial2.println(WiFi.channel());
+ //   Serial2.print("IP:");Serial2.println(WiFi.softAPIP()();
+  }
+
+  if((conf.wifimode==0) || (conf.wifimode==2) || (conf.wifimode==12)) { // STA o AP+STA
+    Serial2.print("Static IP:");Serial2.println(conf.staticIP?"YES":"NO");
+    if(conf.staticIP == 1) {
+      WiFi.config(conf.EEip, conf.EEgw, conf.EEmask, conf.EEdns, conf.EEdns2);
+    }
+    for(byte i=0; i<4; i++) {Serial2.print(conf.EEip[i]); Serial2.print(".");}
+    WiFi.begin(conf.ssidSTA, conf.passSTA, true);
+    byte cont = 0;
+    Serial2.println();
+    Serial2.print("Conectando ");  Serial2.print(conf.ssidSTA);
+    Serial2.print("/");  Serial2.print(conf.passSTA);
+    while((!WiFi.isConnected()) && (cont++ < 20))  { delay(500); Serial2.print("."); }
+    Serial2.println();
+    
+    Serial2.print("STA IP: ");  Serial2.println(WiFi.localIP());
+    Serial2.print("STA MAC: ");  Serial2.println(WiFi.macAddress());
+    Serial2.print("Subnet Mask: ");  Serial2.println(WiFi.subnetMask());
+    Serial2.print("Gateway IP: "); Serial2.println(WiFi.gatewayIP());
+    Serial2.print("DNS: ");  Serial2.println(WiFi.dnsIP());
+  }
+}
+
+void initTime() {
+  ///// Time
+  timeClient.begin();
+  if(WiFi.isConnected()) {
+    timeClient.setTimeOffset(3600);
+    if(timeClient.update()==1)
+      {countfaulttime=0; setTime(timeClient.getEpochTime()); }
+    else {
+      Serial2.print("timeclient.update:");   Serial2.println(timeClient.update());
+    }
+  }
+}
+
+void initFTP() {ftpSrv.begin("admin","admin");  }  //username, password for ftp.  set ports in ESP8266FtpServer.h  (default 21, 50009 for PASV)
+void handleFTP()  { if(conf.ftpenable) { ftpSrv.handleFTP(); } }
+
+void setup()
+{
+  TFT_Init();
+  Serial2.begin(115200, SERIAL_8N2, RXD2, TXD2);   // Init TFT
+  DisplayVersionInfo(FIRMWARE_VERSION_INFO);
+  Init_Cat(38400, SERIAL_8N1);    Serial2.println("Init_Cat");
+  initSPIFSS(false,true);  Serial2.println("initSPIFSS");
+  initSettings();  Serial2.println("initSettings");
+  initPorts();     Serial2.println("initPorts");
+
+  if (conf.userCallsignLength > 0 && ((conf.userCallsignLength & 0x80) == 0x80)) 
+    {
+    conf.userCallsignLength = conf.userCallsignLength & 0x7F;
+    Serial2.print("Callsign:");  Serial2.println(conf.userCallsignLength);
+    }
+  else {
+    Serial2.print("uBITX v0.20");  Serial2.println(conf.userCallsignLength);
+    }
+  if (btnDown())    {
+    factory_Recovery();  Serial2.println("FACTORY RECOVERY BOOT");    }
+  byteToMode(conf.vfoA_mode, 0);  Serial2.println("byteToMode");
+  initOscillators();  Serial2.println("initOscillators");
+  conf.frequency = conf.vfoA;
+  saveCheckFreq = conf.frequency;  //for auto save frequency
+  setFrequency(conf.vfoA);  Serial2.print("setFrequency:"); Serial2.println(conf.vfoA);
+  updateDisplay(true,false);
+#ifdef ENABLE_FACTORYALIGN
+  if (btnDown())    {
+    factory_alignment();    Serial2.println("ENABLE_FACTORYALIGN");   }
+#endif
+  initWiFi();
+  initFTP();
+  initTime();
+  Serial2.println("END SETUP");  Serial2.println("----------------------------");
+}
+
+//Auto save Frequency and Mode with Protected eeprom life by KD8CEC
+void checkAutoSaveFreqMode()
+{
+  //when tx or ritOn, disable auto save
+  if (inTx || conf.ritOn)
+    return;
+
+  //detect change frequency
+  if (saveCheckFreq != conf.frequency)
+  {
+    saveCheckTime = millis();
+    saveCheckFreq = conf.frequency;
+    }
+  else if (saveCheckTime != 0)
+    {
+    //check time for Frequency auto save
+    if (millis() - saveCheckTime > saveIntervalSec * 1000)
+      {
+      FrequencyToVFO(1);
+      saveCheckTime = 0;  //for reduce cpu use rate
+      }
+    }
+}
+
+void task1() {
+  tini=millis();
+  countfaulttime++;   // si se hace mayor que TempDesactPrg,desactiva ejecucion programas dependientes de fecha
+  updateTime();
+//  procesaeventos();
+  // procesaTimeMax();
+
+/**  if(conf.modofi==0)    // normal
+    {
+    } 
+  else if(conf.modofi==2)  // radio
+    { 
+    procesaTF(); 
+    if (tftpage<7) drawTFT();
+    }**/
+  mact1=millis();
+}
+
+void loop(){ 
+  handleFTP();
+  if (isCWAutoMode == 0){  //when CW AutoKey Mode, disable this process
+    if (!txCAT) { checkPTT(); }  
+    checkButton(); 
+    handletfttouch();
+    }
+/** else
+   {
+    controlAutoCW();     Serial2.println("controlAutoCW");
+   }**/
+
+// cwKeyer();   Serial2.println("cwKeyer");
+  //tune only when not tranmsitting 
+  if (tftpage==0)
+    {
+    if (!inTx)
+      {
+      if (isCWAutoMode == 0 || cwAutoDialType == 1)
+        {
+        if (conf.ritOn) {  doRIT();    }
+        else { doTuningWithThresHold();   }
+        }
+      if (isCWAutoMode == 0 && beforeIdle_ProcessTime < millis() - 250) {
+        idle_process();     
+        checkAutoSaveFreqMode();  //move here form out scope for reduce cpu use rate
+        beforeIdle_ProcessTime = millis();
+        }
+      } //end of check TX Status
+    //we check CAT after the encoder as it might put the radio into TX
+    Check_Cat(inTx?1:0); // Serial2.println("Check_Cat");
+    }
+  if((millis() > (mact1 + 1000))) { task1(); }                      // tareas que se hacen cada segundo
+}
+
+void initSPIFSS(boolean testfiles, boolean format) {
+  if(SPIFFS.begin(format)) { Serial2.println("SPIFSS OK"); } else  { Serial2.println("SPIFSS ERROR"); }
+  if(testfiles) {
+    File dir=SPIFFS.open("/");
+    File file=dir.openNextFile();
+    while(file) { Serial2.print(file.name()); Serial2.print(b); Serial2.println(file.size()); file=dir.openNextFile(); }
+  }
+}
+
+int readconf()
+{
+  File auxfile=SPIFFS.open(fileconf,"r");
+  if (!auxfile) return 0;
+  int count=0;
+  for (count=0;count<sizeof(conf);count++)*(buffconf+count)=auxfile.read();
+  auxfile.close();
+  return count;
+}
+
+void saveconf()
+{
+  File auxfile=SPIFFS.open(fileconf, "r+");
+  if (auxfile) { auxfile.write(buffconf,sizeof(conf)); auxfile.close();  }
+}
+
