@@ -164,9 +164,9 @@ void menuCHMemory(int btn, byte isMemoryToVfo){
     while(!btnDown()){
       if (isDisplayInfo == 1) {
         //Display Channel info *********************************
-        memset(c, 0, sizeof(c));
+        memset(auxc, 0, sizeof(auxc));
         if (selectChannel >= 20 || selectChannel <=-1)  {
-          strcpy(c, "Exit?");    }
+          strcpy(auxc, "Exit?");    }
         else
           {
           //Read Frequency from eeprom
@@ -178,17 +178,17 @@ void menuCHMemory(int btn, byte isMemoryToVfo){
           tmpFreq = resultFreq;
           for (int i = 15; i >= 6; i--) {
             if (tmpFreq > 0) {
-              if (i == 12 || i == 8) c[i] = '.';
+              if (i == 12 || i == 8) auxc[i] = '.';
               else {
-                c[i] = tmpFreq % 10 + 0x30;
+                auxc[i] = tmpFreq % 10 + 0x30;
                 tmpFreq /= 10;
                 }
               }
             else
-              c[i] = ' ';
+              auxc[i] = ' ';
             }
           }
-        printLine(0,c);
+        printLine(0,auxc);
         isDisplayInfo = 0;
       }
 
@@ -449,9 +449,9 @@ int getValueByKnob(int valueType, int targetValue, int minKnobValue, int maxKnob
 
     if (valueType < 10)
       {
-      strcpy(b, "Press, set ");
-      strcat(b, displayTitle);
-      printLine(1,b);
+      strcpy(auxb, "Press, set ");
+      strcat(auxb, displayTitle);
+      printLine(1,auxb);
       }
     
     while(!btnDown())
@@ -473,20 +473,20 @@ int getValueByKnob(int valueType, int targetValue, int minKnobValue, int maxKnob
           moveDetectStep = 0;
           }
 
-        strcpy(b, displayTitle);
+        strcpy(auxb, displayTitle);
 
         if (valueType == 11)   //Mode Select
           {
-          b[targetValue * 4] = '>';
+          auxb[targetValue * 4] = '>';
           }
         else
           {
-          strcat(b, ":");
-          itoa(targetValue,c, 10);
-          strcat(b, c);
+          strcat(auxb, ":");
+          itoa(targetValue,auxc, 10);
+          strcat(auxb, auxc);
           }
         
-        printLine(0,b);
+        printLine(0,auxb);
 
         if (valueType == 1) //Generate Side Tone
           {
@@ -516,11 +516,11 @@ void menuCWSpeed(int btn){
     wpm = 1200/conf.cwSpeed;
      
     if (!btn){
-     strcpy(b, "CW:");
-     itoa(wpm,c, 10);
-     strcat(b, c);
-     strcat(b, "WPM Change?");
-     printLine(0,b);
+     strcpy(auxb, "CW:");
+     itoa(wpm,auxc, 10);
+     strcat(auxb, auxc);
+     strcat(auxb, "WPM Change?");
+     printLine(0,auxb);
      return;
     }
     wpm = getValueByKnob(0, wpm, 3, 50, 1, "WPM", 3);
@@ -824,10 +824,10 @@ void doMenu(){
     {
       delay_background(50, 0);
       if (isNeedDisplay) {
-        strcpy(b, "Tune Step:");
-        itoa(conf.arTuneStep[conf.tuneStepIndex -1], c, 10);
-        strcat(b, c);
-        printLine(0,b);
+        strcpy(auxb, "Tune Step:");
+        itoa(conf.arTuneStep[conf.tuneStepIndex -1], auxc, 10);
+        strcat(auxb, auxc);
+        printLine(0,auxb);
         isNeedDisplay = 0;
       }
         
@@ -842,7 +842,7 @@ void doMenu(){
               conf.tuneStepIndex--;
           }
           else {
-            if (conf.tuneStepIndex < 5)
+            if (conf.tuneStepIndex < 9)
               conf.tuneStepIndex++;
           }
           select = 0;
@@ -1054,6 +1054,42 @@ void menuRitToggle(int btn){
     }
 }
 
+void setupBFO(){
+  int knob = 0;
+  unsigned long prevCarrier;
+   
+  prevCarrier = conf.usbCarrier;
+
+  tft.drawString("Set BFO",0,130);
+  tft.drawString("Press TUNE to Save",0,170);
+  
+  conf.usbCarrier = 11053000l;
+  si5351bx_setfreq(0, conf.usbCarrier);
+  printCarrierFreq(conf.usbCarrier);
+
+  while (!btnDown()){
+    tft.drawString("00000000",160,60);
+    tft.fillRect(160, 60, 160, 20, TFT_BLACK);
+    tft.drawNumber(conf.usbCarrier,160,60);
+    knob = enc_read();
+
+    if (knob != 0)
+      conf.usbCarrier -= 50 * knob;
+    else
+      continue; //don't update the frequency or the display
+      
+    si5351bx_setfreq(0, conf.usbCarrier);
+    setFrequency(conf.frequency);
+    delay(100);
+  }
+
+  saveconf();
+  si5351bx_setfreq(0, conf.usbCarrier);          
+  setFrequency(conf.frequency);    
+//  updateDisplay();
+  menuOn = 0; 
+}
+
 void setupFreq(){
   Serial2.println("setupFreq");
   int knob = 0;
@@ -1068,13 +1104,14 @@ void setupFreq(){
   prev_calibration = conf.calibration;
   conf.calibration = 0;
   tft.drawString("You should have a signal",0,130);
-  tft.drawString("exactly at        Khz",0,150);
-  tft.drawNumber(conf.frequency/1000l,140,150);
+  tft.drawString("exactly at      Khz",0,150);
+  tft.drawNumber(conf.frequency/1000l,135,150);
   tft.drawString("Rotate to zerobeat",0,170);
 
   while (!btnDown())
     {
-    tft.drawString("        ",160,40);
+    tft.drawString("00000000",160,40);
+    tft.fillRect(160, 40, 160, 20, TFT_BLACK);
     tft.drawNumber(conf.calibration,160,40);
     knob = enc_read();
     if (knob != 0)
@@ -1126,12 +1163,12 @@ void factoryCalibration(int btn){
   startTx(TX_CW, 1);
   si5351bx_setfreq(2, 10000000l); 
   
-  strcpy(b, "#1 10 MHz cal:");
-  ltoa(conf.calibration/8750, c, 10);
-  strcat(b, c);
-  Serial2.print("b:");Serial2.println(b);
+  strcpy(auxb, "#1 10 MHz cal:");
+  ltoa(conf.calibration/8750, auxc, 10);
+  strcat(auxb, auxc);
+  Serial2.print("auxb:");Serial2.println(auxb);
   tft.drawNumber(conf.calibration,90,110);
-  printLine(7,b);     
+  printLine(7,auxb);     
 
   while (!btnDown())
     {
@@ -1146,10 +1183,10 @@ void factoryCalibration(int btn){
       
     si5351_set_calibration(conf.calibration);
     si5351bx_setfreq(2, 10000000l);
-    strcpy(b, "#1 10 MHz cal:");
-    ltoa(conf.calibration/8750, c, 10);
-    strcat(b, c);
-    printLine(7,b);     
+    strcpy(auxb, "#1 10 MHz cal:");
+    ltoa(conf.calibration/8750, auxc, 10);
+    strcat(auxb, auxc);
+    printLine(7,auxb);     
     }
 
   conf.cwTimeout = 0;
@@ -1186,10 +1223,10 @@ void menuSetupCalibration(int btn){
   si5351_set_calibration(conf.calibration);
   setFrequency(conf.frequency);    
   
-  strcpy(b, "cal:");
-  ltoa(conf.calibration/8750, c, 10);
-  strcat(b, c);
-  printLine(0,b);     
+  strcpy(auxb, "cal:");
+  ltoa(conf.calibration/8750, auxc, 10);
+  strcat(auxb, auxc);
+  printLine(0,auxb);     
 
   while (digitalRead(PTT) == HIGH && !btnDown())
   {
@@ -1210,10 +1247,10 @@ void menuSetupCalibration(int btn){
     si5351bx_setfreq(0, conf.usbCarrier);
     setFrequency(conf.frequency);    
 
-    strcpy(b, "cal:");
-    ltoa(conf.calibration/8750, c, 10);
-    strcat(b, c);
-    printLine(0,b);     
+    strcpy(auxb, "cal:");
+    ltoa(conf.calibration/8750, auxc, 10);
+    strcat(auxb, auxc);
+    printLine(0,auxb);     
   }
   
   //save the setting
@@ -1236,17 +1273,17 @@ void menuSetupCalibration(int btn){
 
 void printCarrierFreq(unsigned long freq){
 
-  memset(c, 0, sizeof(c));
-  memset(b, 0, sizeof(b));
+  memset(auxc, 0, sizeof(auxc));
+  memset(auxb, 0, sizeof(auxb));
 
-  ultoa(freq, b, DEC);
+  ultoa(freq, auxb, DEC);
   
-  strncat(c, b, 2);
-  strcat(c, ".");
-  strncat(c, &b[2], 3);
-  strcat(c, ".");
-  strncat(c, &b[5], 3);
-  printLine(0,c);    
+  strncat(auxc, auxb, 2);
+  strcat(auxc, ".");
+  strncat(auxc, &auxb[2], 3);
+  strcat(auxc, ".");
+  strncat(auxc, &auxb[5], 3);
+  printLine(0,auxc);    
 }
 
 //modified by KD8CEC (just 1 line remarked //usbCarrier = ...

@@ -105,19 +105,11 @@
 // for public, Variable, functions
 //==============================================================================
 //Ham Band
-#define MAX_LIMIT_RANGE 10  
-#define WSPR_BAND_COUNT 3
-#define TX_SSB          0
-#define TX_CW           1
-
 //0x00 : None, 0x01 : MODE, 0x02:BAND+, 0x03:BAND-, 0x04:TUNE_STEP, 0x05:VFO Toggle, 0x06:SplitOn/Off, 0x07:TX/ON-OFF,  0x08:SDR Mode On / Off, 0x09:Rit Toggle
 #define FKEY_PRESS      0x78
 
-extern char c[30];
-extern char b[30];
-//char fileconf[]="/conf.txt";
-char fileconf[]="/ubitx.cnf";
-byte tftpage=0;
+extern char auxc[30];
+extern char auxb[30];
 
 #endif    //end of if header define
 

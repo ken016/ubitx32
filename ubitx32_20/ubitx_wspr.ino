@@ -120,29 +120,22 @@ void SendWSPRManage()
         TX_MSNB_P2 = ((unsigned long)Wspr_Reg1[5] & 0x0F) << 16 | ((unsigned long)Wspr_Reg1[6]) << 8 | Wspr_Reg1[7];
       }
 
-      if (digitalRead(PTT) == 0)
-        strcpy(c, "SEND: ");
-      else
-        strcpy(c, "PTT-> ");
-
-      //ltoa(WsprTXFreq, b, DEC);
-      //strcat(c, b);
-
+      strcpy(auxc, digitalRead(PTT) == 0?"SEND: ":"PTT-> ");
       //display frequency, Frequency to String for KD8CEC
       unsigned long tmpFreq = WsprTXFreq;
       for (int i = 15; i >= 6; i--) {
         if (tmpFreq > 0) {
-          if (i == 12 || i == 8) c[i] = '.';
+          if (i == 12 || i == 8) auxc[i] = '.';
           else {
-            c[i] = tmpFreq % 10 + 0x30;
+            auxc[i] = tmpFreq % 10 + 0x30;
             tmpFreq /= 10;
           }
         }
         else
-          c[i] = ' ';
+          auxc[i] = ' ';
       }
          
-      printLine(1,c);
+      printLine(1,auxc);
 
     if (digitalRead(PTT) == 0)
       {

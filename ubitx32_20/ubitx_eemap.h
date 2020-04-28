@@ -21,9 +21,6 @@
 //==============================================================================
 // Factory-shipped EEProm address (factory Firmware) Address : 0 ~ 31
 //==============================================================================
-//these are ids of the vfos as well as their offset into the eeprom storage, don't change these 'magic' values
-#define VFO_A   16
-#define VFO_B   20
 
 //==============================================================================
 // KD8CEC EEPROM MAP

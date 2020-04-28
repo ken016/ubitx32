@@ -31,7 +31,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 **************************************************************************/
-
+#include <Wire.h>
 #include "ubitx.h"
 
 //for broken protocol
@@ -520,8 +520,7 @@ void WriteEEPRom_FT817(byte fromType)
       if (sideTonePitch != 0 || sideToneSub != 0)
         {
         conf.sideTone = (sideTonePitch * 50 + 300) + sideToneSub;
-        printLineF(0,F("Sidetone set! CAT"));
-        saveconf();
+        printLineF(0,F("Sidetone set! CAT"));        saveconf();
         delay(300);        //If timeout errors occur in the calling software, remove them
         clearLine2();
         }
