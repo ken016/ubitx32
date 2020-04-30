@@ -14,6 +14,7 @@ Some features
 - Config stored at files (SPIFFSS), not EEPROM
 - FTP server
 - Real Time Clock
+- Web update
 
 Ramón
 EA4GZI
