@@ -1057,36 +1057,27 @@ void menuRitToggle(int btn){
 void setupBFO(){
   int knob = 0;
   unsigned long prevCarrier;
-   
   prevCarrier = conf.usbCarrier;
-
   tft.drawString("Set BFO",0,130);
   tft.drawString("Press TUNE to Save",0,170);
-  
-  conf.usbCarrier = 11053000l;
   si5351bx_setfreq(0, conf.usbCarrier);
   printCarrierFreq(conf.usbCarrier);
-
+  displayYN();
   while (!btnDown()){
-    tft.drawString("00000000",160,60);
-    tft.fillRect(160, 60, 160, 20, TFT_BLACK);
-    tft.drawNumber(conf.usbCarrier,160,60);
+    tft.fillRect(210, 80, 160, 20, TFT_BLACK);
+    tft.drawNumber(conf.usbCarrier,210,80);
     knob = enc_read();
-
     if (knob != 0)
-      conf.usbCarrier -= 50 * knob;
+      conf.usbCarrier += 50 * knob;
     else
       continue; //don't update the frequency or the display
-      
     si5351bx_setfreq(0, conf.usbCarrier);
     setFrequency(conf.frequency);
     delay(100);
   }
-
   saveconf();
   si5351bx_setfreq(0, conf.usbCarrier);          
   setFrequency(conf.frequency);    
-//  updateDisplay();
   menuOn = 0; 
 }
 
@@ -1097,22 +1088,19 @@ void setupFreq(){
   //round off the the nearest khz
   conf.frequency = (conf.frequency/1000l)* 1000l;
   setFrequency(conf.frequency);
-  
   while (btnDown()) delay(100);
   delay(100);
-  tft.drawNumber(conf.calibration,160,40);
+  tft.drawNumber(conf.calibration,210,50);
   prev_calibration = conf.calibration;
-  conf.calibration = 0;
   tft.drawString("You should have a signal",0,130);
   tft.drawString("exactly at      Khz",0,150);
   tft.drawNumber(conf.frequency/1000l,135,150);
   tft.drawString("Rotate to zerobeat",0,170);
-
+  displayYN();
   while (!btnDown())
     {
-    tft.drawString("00000000",160,40);
-    tft.fillRect(160, 40, 160, 20, TFT_BLACK);
-    tft.drawNumber(conf.calibration,160,40);
+    tft.fillRect(210, 50, 160, 20, TFT_BLACK);
+    tft.drawNumber(conf.calibration,210,50);
     knob = enc_read();
     if (knob != 0)
       conf.calibration += knob * 875;

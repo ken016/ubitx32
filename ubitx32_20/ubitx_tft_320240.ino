@@ -33,15 +33,17 @@ TFT_eSPI_Button btMain[10];        // buttons main display
 TFT_eSPI_Button btNav[5];          // buttons main display
 TFT_eSPI_Button btSet[5];          // buttons Setting display
 TFT_eSPI_Button btFlot[5];         // buttons flotantes
-TFT_eSPI_Button btSta[5];        // buttons Status
+TFT_eSPI_Button btSta[5];          // buttons Status
+TFT_eSPI_Button btYN[2];           // buttons OK / Cancel
 byte btMainact[10]={0,0,0,0,0,0,0,0,0,0};
 byte btSetact[15]={1,1,0,0,0};
 byte btNavact[5]={1,0,0,0,1};
 byte btFlotact[5]={1,0,0,0,0};
 char btMaintext[15][8]={"RX","TX","vfo ","Band","Band","LSB","USB","CW","RIT","SPL"};
-char btSettext[5][8]={"CAL","BFO","xxx","xxx","xxx"};
+char btSettext[5][15]={"Calibration","BFO","xxx","xxx","xxx"};
 char btNavtext[5][8]={"<","xxx","xxx","xxx",">"};
 char btFlottext[5][8]={"Ent","xxx","xxx","xxx","xxx"};
+char btYNtext[2][8]={"OK","Cancel"};
 
 char softBuffLines[2][20 + 1];
 char softBuffSended[2][20 + 1];
@@ -461,11 +463,11 @@ void displayStatus()
   strcpy(auxc,WiFi.isConnected()?"CON":"DIS");
   btSta[0].initButtonUL(&tft,70,220,40,20,2,WiFi.isConnected()?TFT_GREEN:TFT_RED,TFT_BLACK,auxc,2);
   btSta[0].drawButton();
-  btSta[1].initButtonUL(&tft,150,220,30,20,2,TFT_WHITE,TFT_BLACK,itoa(hour(),buff,10),2);
+  btSta[1].initButtonUL(&tft,150,220,30,20,2,TFT_BLACK,TFT_WHITE,itoa(hour(),buff,10),2);
   btSta[1].drawButton();
-  btSta[2].initButtonUL(&tft,186,220,30,20,2,TFT_WHITE,TFT_BLACK,itoa(minute(),buff,10),2);
+  btSta[2].initButtonUL(&tft,186,220,30,20,2,TFT_BLACK,TFT_WHITE,itoa(minute(),buff,10),2);
   btSta[2].drawButton();
-  btSta[3].initButtonUL(&tft,219,220,30,20,2,TFT_WHITE,TFT_BLACK,itoa(second(),buff,10),2);
+  btSta[3].initButtonUL(&tft,219,220,30,20,2,TFT_BLACK,TFT_WHITE,itoa(second(),buff,10),2);
   btSta[3].drawButton();
   tft.setTextSize(2);  tft.setTextColor(TFT_WHITE);
   tft.drawString(":",210,220); 
@@ -512,12 +514,22 @@ void displayNav()
     }
 }
 
+void displayYN()
+{
+  // botones Yes/Cancel
+  for (byte i=0;i<2;i++)
+    {
+    btYN[i].initButtonUL(&tft,248*i,210,60,30,2,TFT_WHITE,TFT_BLACK,btYNtext[i],2);
+    btYN[i].drawButton();
+    }
+}
+
 void displaySet()
 {
   // botones setting
   for (byte i=0;i<5;i++) if (btSetact[i]==1)
     {
-    btSet[i].initButtonUL(&tft,0,40*(i+1),60,30,2,TFT_WHITE,TFT_BLACK,btSettext[i],2);
+    btSet[i].initButtonUL(&tft,0,40*(i+1),160,30,2,TFT_WHITE,TFT_BLACK,btSettext[i],2);
     btSet[i].drawButton();
     }
 }
@@ -561,8 +573,9 @@ void updateDisplay(boolean alldata, boolean freqdata) {
       {
       // data
       displaySet();
-      tft.drawString("Calibration:",50,60); tft.drawNumber(conf.calibration,210,60);
-      tft.drawString("BFO",50,90); tft.drawNumber(conf.usbCarrier,210,90);
+      tft.setTextColor(TFT_WHITE, TFT_BLACK);
+      tft.drawNumber(conf.calibration,210,50);
+      tft.drawNumber(conf.usbCarrier,210,80);
       displayNav();
       displayStatus();
       }

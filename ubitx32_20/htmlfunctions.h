@@ -1,9 +1,5 @@
 
-
-void ICACHE_FLASH_ATTR dPrint(String texto) { Serial.print(texto); }
-void ICACHE_FLASH_ATTR dPrint(char* texto) { Serial.print(texto); }
-void ICACHE_FLASH_ATTR dPrint(PGM_P texto)  { Serial.print(texto); }
-void ICACHE_FLASH_ATTR dPrintI(int valor)   { Serial.print(valor); }
+const char* serverIndex = "<form method='POST' action='/update' enctype='multipart/form-data'><input type='file' name='update'><input type='submit' value='Update'></form>";
 
 void ICACHE_FLASH_ATTR printColspan(int ancho)
   { printP(c(tdcolspan_i)); printI(ancho); printP(comillas, mayor);}
@@ -367,3 +363,731 @@ void ICACHE_FLASH_ATTR printDiaSem(byte i)
   if (i==6) printP(letraS);  
   }
 
+void htmlNotFound()
+{
+  msg=vacio;
+  printP("HTTP/1.1", b);
+  printP("404", b);
+  server.send(404, "text/plain", msg);
+  msg=vacio;
+}
+
+
+void panelHTML() {
+  msg=vacio;
+  if (server.method()==HTTP_POST) return; 
+  writeHeader(false,true);
+  byte auxI=server.arg(0).toInt();
+  writeMenu(1, auxI);
+  printP(menor, table);
+  printP(b, "class", ig, tpanel, mayor);
+  printP(tr);
+  printColspan(2);
+  
+  /////////////  CONTENIDO   ///////////
+  printP("uBitx", td_f, tr_f);
+  printP(tr,td,"VFO",td_f,td); printP(conf.vfoActive==VFO_A?"A":"B"); printP(td_f, tr_f);
+  printP(tr,td,"Mode",td_f,td); printP(conf.isUSB==1?"USB":"LSB"); printP(td_f, tr_f);
+  printP(tr,td,"CW",td_f,td); printP(conf.cwMode>=1?"ON":"OFF"); printP(td_f, tr_f);
+  printP(tr,td,"RIT",td_f,td); printP(conf.ritOn>=1?"ON":"OFF"); printP(td_f, tr_f);
+  printP(tr,td,"SPL",td_f,td); printP(conf.splitOn>=1?"ON":"OFF"); printP(td_f, tr_f);
+  printP(tr,td,"Frequency",td_f,td); printI(conf.frequency); printP(td_f, tr_f);
+
+  // final
+  printP(menor,letrat,letrar,b,c(tid));
+  printP(ig,comilla,letrat,letrat,comilla,mayor);
+  HtmlGetStateTime();
+  printP(tr_f, menor, barra, table, mayor);
+  printP(c(body_f), menor, barra,thtml, mayor);
+  serversend200();
+}
+
+void ICACHE_FLASH_ATTR indexHTML() 
+  {
+  panelHTML();
+  }
+
+
+void setupDevHTML()
+{
+  msg=vacio;
+  mp=1;
+  if (server.method()==HTTP_POST)
+    {
+    for (int i=0; i<server.args(); i++)
+      {
+      calcindices(i);
+      if (param_number==0)    // callsign
+        {
+        }
+      else if (param_number==1) { conf.calibration = server.arg(i).toInt();  }
+      else if (param_number==2) { conf.usbCarrier = server.arg(i).toInt();  }
+      else if (param_number==3) { conf.latitud = server.arg(i).toFloat();  }
+      else if (param_number==4) { conf.longitud = server.arg(i).toFloat(); }
+      else if (param_number==5) { conf.lang = server.arg(i).toInt(); }   
+      else if (param_number==6) { conf.cwSpeed = server.arg(i).toInt(); }
+      else if (param_number==7) { conf.cwDelayTime = server.arg(i).toInt(); }
+      else if (param_number==8) { conf.cwKeyType = server.arg(i).toInt(); }
+      else if (param_number==9) { conf.SI5351BX_ADDR = server.arg(i).toInt(); }
+      else if (param_number==99) { conf.rstper = server.arg(i).toInt(); } // período rset automatico
+      }
+    saveconf();
+    readconf();
+    sendOther(sdhtm,-1);
+    return;
+    }
+
+  writeHeader(false,false);
+  writeMenu(3, 0);
+  writeForm(sdhtm);
+
+  printparCP("CALLSIGN", 0, conf.CallSign, 19, false);
+  printP(tr,td,"Calibration/usbCarrier",td_f); 
+  printcampoL(1, conf.calibration, 10, true, true);
+  printcampoL(2,  conf.usbCarrier, 10, true, true); 
+
+  printP(tr, td, href_i, comillas);
+  pc(thttp);
+  pc(gmaps);
+  printP(comillas, b, c(newpage), mayor);
+  printP(t(latitudt), barraesp);
+  printP(t(longitudt), href_f, td_f, td);
+  printcampoF(3, conf.latitud, 6);  printP(td_f, td);
+  printcampoF(4, conf.longitud, 6);  printP(td_f, tr_f);
+
+  printP(tr, td, t(idioma),td_f);
+  printcampoCB(5, conf.lang, PSTR("Español"), PSTR("English"),true); 
+  printP(td_f,tr_f);
+
+  printP(tr,td,"CW Speed"); 
+  printcampoI(6, conf.cwSpeed, 5, true, true); printP(td_f,tr_f);
+  printP(tr,td,"cwDelayTime"); 
+  printcampoI(7, conf.cwDelayTime, 5, true, true); printP(td_f,tr_f);
+  printP(tr,td,"cwKeyType",td_f); 
+  printcampoCB(8, conf.cwKeyType, "straight", "iambica", "iambicb", true);
+  printP(tr,td,"SI5351BX_ADDR"); 
+  printcampoI(9, conf.SI5351BX_ADDR, 5, true, true); printP(td_f,tr_f);
+  
+
+  printP(tr, td, "Reset periodico (horas)",td_f,td);
+  printcampoCB(99,conf.rstper,1,24,false); 
+  printP(td_f,tr_f);
+
+  writeFooter(guardar, false);
+  serversend200();
+}
+
+void ICACHE_FLASH_ATTR setupNetHTML()
+{
+  if (!autOK()) { sendOther(loghtm,-1); return; }
+  msg=vacio;
+  mp=1;
+  if (server.method()==HTTP_POST)
+    {
+    conf.staticIP=0;
+    for (int i = 0; i < server.args(); i++)
+      {
+      calcindices(i);
+      if (param_number>=0 && param_number <= 5) { server.arg(i).toCharArray(conf.EEmac[i], 3);  }
+      else if (param_number>=6 && param_number <= 8)
+        {
+        conf.EEip[param_number-6]=server.arg(i).toInt();
+        conf.EEgw[2]=conf.EEip[2];
+        strcpy(hostraiz,itoa(conf.EEip[0],buff,10)); strcat(hostraiz, punto);
+        strcat(hostraiz,itoa(conf.EEip[1],buff,10)); strcat(hostraiz, punto);
+        strcat(hostraiz,itoa(conf.EEip[2],buff,10)); strcat(hostraiz, punto);
+        }
+      else if (param_number>=10 && param_number <= 13) { conf.EEmask[param_number-10] = server.arg(i).toInt(); }
+      else if (param_number>=14 && param_number <= 17) { conf.EEgw[param_number-14] = server.arg(i).toInt();   }
+      else if (param_number>=18 && param_number <= 21) { conf.EEdns[param_number-18] = server.arg(i).toInt();  }
+      else if (param_number==22) { conf.webPort = server.arg(i).toInt();  }
+      else if (param_number==41) { conf.wifimode = server.arg(i).toInt(); }
+      else if (param_number==42) { server.arg(i).toCharArray(conf.ssidSTA, 20);}
+      else if (param_number==43) { server.arg(i).toCharArray(conf.passSTA, 20); }
+      //      else if (param_number == 44) {server.arg(i).toCharArray(conf.ssidAP,20);}
+      else if (param_number==45) { server.arg(i).toCharArray(conf.passAP, 9); }
+      else if (param_number==46) { conf.staticIP = server.arg(i).toInt(); }
+      else if (param_number>=47 && param_number <= 50) { conf.EEdns2[param_number - 47] = server.arg(i).toInt(); }
+      else if (param_number==56) { conf.canalAP = server.arg(i).toInt()+1; }
+      }
+    //
+    //    nAP = 0;
+    saveconf();
+    sendOther(snehtm,-1); return;
+    }
+
+  writeHeader(false,false);
+  writeMenu(3, 3);
+  writeForm(snehtm);
+
+  printP(tr, td, t(Modo), b, td_f);
+  printcampoCB(41, conf.wifimode, sta, ap, apsta,true);
+  printP(tr_f);
+
+  // ssid
+  printP(tr);
+  ccell(routerssid);
+  printP(td);
+  printcampoC(42, conf.ssidSTA, 20, true, true, false,false);
+  printP(href_i, comillas, scanap, comillas,mayor, b);
+  printP(t(explorar), href_f, td_f, tr_f);
+
+  printparCP(c(routerpass), 43, conf.passSTA, 20, false); 
+
+  printP(tr);
+  ccell(apssid);
+  cell(conf.ssidAP);
+  printP(tr_f);
+  printparCP(c(appass), 45, conf.passAP, 9, false);
+  printP(tr, td, t(canal), td_f, td);
+  printP(c(Select_name),comillas);
+  printIP(56, comillas);
+  printP(mayor);
+  for (byte j = 0; j < 13; j++)   { // canales
+    pc(optionvalue);
+    printPiP(comillas, j, comillas);
+    if (conf.canalAP-1==j) printP(b, selected, ig, comillas, selected, comillas);
+    printPiP(mayor, j+1, c(option_f));
+  }
+  printP(c(select_f), td_f, tr_f);
+
+  espacioSep(2);
+  printP(tr);
+  ccell(MAC);
+  printP(td);
+  for (byte i=0; i<5; i++) printP(conf.EEmac[i]); printP(conf.EEmac[5]); 
+  printP(td_f, tr_f);
+  printP(tr, td, t(staticip), td_f, conf.staticIP ? th : td);
+  checkBox(46,conf.staticIP,false);
+  printP(conf.staticIP?th_f:td_f,tr_f);
+
+  // print the current IP
+  printP(tr, td, t(DIRIP), td_f, td);
+  for (byte i=0; i<3; i++) { printI(conf.EEip[i]); printP(punto);  }  printI(conf.EEip[3]);
+  printP(td_f, tr_f);
+
+  printP(tr);
+  ccell(tIP);
+  printP(td);
+  for (byte i=0; i<4; i++) printcampoI(6+i, conf.EEip[i],3,i!=3,false);
+  printP(td_f, tr_f,tr);
+  ccell(tmask);
+  printP(td);
+  for (byte i=0; i<4; i++) printcampoI(i+10, conf.EEmask[i], 3, true,false);
+  printP(td_f, tr_f);
+  
+  printP(tr, td, c(ngateway), td_f, td);
+  for (byte i=0; i<4; i++) printcampoI(i+14, i==2?conf.EEip[i]:conf.EEgw[i],3,i!=2,false);
+  printP(td_f, tr_f);
+
+  printP(tr,td);
+  printP("DNS");
+  printP(td_f,td);
+  for (byte i=0; i<4; i++) printcampoI(i+18, conf.EEdns[i], 3, true,false);
+  printP(td_f, tr_f);
+  
+  printP(tr, td, t(ippublica), td_f, td);
+  printP(conf.myippub, td_f, tr_f);
+
+  //  printP(tr,td,ttimeoutrem,td_f,td);
+  //  printcampoL(53, timeoutrem, 5,true);
+  //  printP(td_f,tr_f);
+  //  printP(tr,td,c(ttimeoutNTP),td_f,td);
+  //  printcampoL(54, conf.timeoutNTP, 5,true);
+  //  printP(td_f,tr_f);
+
+  printP(menor, barra, table, mayor, menor, c(tinput));
+  printP(b, type, ig, comillas, submit, comillas);
+  printP(b, tvalue, ig, comillas);
+  printP(tguardar, comillas);
+  printP(mayor, menor, barra, c(tinput), mayor);
+  pc(form_f);
+  printP(c(body_f), menor, barra);
+  printP(thtml, mayor);
+  serversend200();
+}
+
+void ICACHE_FLASH_ATTR setupNetServHTML()
+{
+  msg=vacio;
+  mp=1;
+  if (server.method() == HTTP_POST)
+    {
+    conf.dweetenabled=0; conf.iftttenabled=0; conf.myjsonenabled=0; 
+    conf.ftpenable=0; conf.mqttenabled=0; conf.iottweetenable=0;
+    for (int i=0; i<server.args(); i++)
+      {
+      calcindices(i);
+      if (param_number==0) { server.arg(i).toCharArray(conf.hostmyip, 30); }
+      else if (param_number==1) { conf.ftpenable=server.arg(i).toInt();  } // ftp server enabled      }
+      else if (param_number==2) { conf.iftttenabled=server.arg(i).toInt(); } // enable IFTTT
+      else if (param_number==3) { server.arg(i).toCharArray(conf.iftttkey, 30); }
+      else if (param_number==4) { conf.dweetenabled=server.arg(i).toInt(); }   // modo Dweet.io
+      else if (param_number==5) { conf.myjsonenabled=server.arg(i).toInt(); if (conf.myjsonenabled==0) conf.idmyjsonST=0; }  // modo myjson.com
+      else if (param_number==6) { conf.iottweetenable=server.arg(i).toInt();  } // iottweet enabled      }
+      else if (param_number==7) { server.arg(i).toCharArray(conf.iottweetuser, 10); }
+      else if (param_number==8) { server.arg(i).toCharArray(conf.iottweetkey, 15);  }
+      else if (param_number==9) { conf.mqttenabled=server.arg(i).toInt(); } // enable MQTT
+      else if (param_number==10) { server.arg(i).toCharArray(conf.mqttserver, 40);  }
+      else if (param_number>=11) { server.arg(i).toCharArray(conf.mqttpath[param_number-11], 10);  }
+      }
+    saveconf();
+  //  createdashfile();
+    sendOther(snshtm,-1);
+    return;
+    }
+
+  writeHeader(false,false);
+  writeMenu(3, 4);
+  writeForm(snshtm);
+
+  printP(tr);
+  tcell(ippubserver);
+  printP(td, td_f);
+  printColspan(2);
+  printcampoC(0, conf.hostmyip, 30, true, true, false,false);
+  printP(td_f, tr_f);
+
+  printP(tr);
+  tcell(ftpserver);
+  checkBox(1, conf.ftpenable,true);
+  printColspan(2);
+  printP(tr_f);
+
+  printP(tr, td, href_i, comillas);
+  pc(thttps);
+  pc(iftttcom);
+  printP(comillas, b, c(newpage), mayor);
+  pc(ifttt);
+  printP(barraesp,c(Key), href_f, td_f, conf.iftttenabled?th:td);
+  checkBox(2, conf.iftttenabled,false);
+  printP(conf.iftttenabled?th_f:td_f);
+  printColspan(2);
+  printcampoC(3, conf.iftttkey, 30, true, true, false,false);
+  printP(td_f, tr_f);
+
+  printP(tr, td, href_i, comillas);
+  pc(thttp);
+  pc(dweetio);
+  printP(comillas, b, c(newpage), mayor);
+  pc(dweet);
+  printP(barraesp,c(dweetname), href_f, td_f, conf.dweetenabled ? th : td);
+  checkBox(4, conf.dweetenabled,false);
+  printP(td_f);
+  printColspan(2);
+  if (conf.dweetenabled==1)
+    {
+    printP(href_i);
+    pc(urldweet);
+    pc(conuco); // 5 últimos dweets 24h
+    printP(mac, mayor, c(conuco), mac, href_f);
+    }
+  printP(td_f, tr_f);
+
+  printP(tr, td, href_i, comillas);
+  pc(thttp);
+  pc(myjsoncom);
+  printP(comillas,b, c(newpage), mayor);
+  pc(modomyjsont);
+  printP(barraesp, c(Key), href_f, td_f, conf.myjsonenabled ? th : td);
+  checkBox(5, conf.myjsonenabled,false);
+  printP(conf.myjsonenabled ? th_f : td_f);
+  printColspan(2);
+  if (conf.myjsonenabled== 1) 
+    {
+    printP(href_i, comillas);
+    pc(thttps);
+    printP(c(api), punto);
+    pc(myjsoncom);
+    printP(c(bins), conf.idmyjson, interr);
+    printP(c(pretty), comillas);
+    printP(mayor, conf.idmyjson, href_f);
+    }
+  printP(td_f, tr_f);
+
+  printP(tr, td, href_i, comillas);
+  pc(thttp);
+  pc(iottweetcom);
+  printP(comillas, b, c(newpage), mayor);
+  pc(iottweett);
+  printP(barraesp, t(usuario), barraesp);
+  printP(c(Key), href_f, td_f, conf.iottweetenable == 1 ? th : td);
+  checkBox(6, conf.iottweetenable,false);
+  printP(conf.iottweetenable==1?th_f:td_f);
+  printcampoC(7, conf.iottweetuser, 10, true, true, false,true);
+  printcampoC(8, conf.iottweetkey, 15, true, true, false,true);
+  printP(tr_f);
+
+  printP(tr,td,c(mqtt),b);
+  printP(c(tserver),td_f);
+  printP(conf.mqttenabled==1?th:td);
+  checkBox(9, conf.mqttenabled,false);
+  printP(td_f);
+  printColspan(2);
+  printcampoC(10, conf.mqttserver, 40, true, true, false,false);
+  printP(conf.mqttenabled==1?th_f:td_f,tr_f);
+  
+  for (byte i=0;i<3;i++)
+    {
+    printP(tr);
+    printColspan(2);
+    if (i==0) { printP(c(mqtt),b); pc(tpath); }
+    printP(td_f,td);
+    printcampoC(11+(i*2), conf.mqttpath[i*2], 10, true, true, false,false);
+    printP(barra,td_f,td);
+    printcampoC(12+(i*2), conf.mqttpath[i*2+1], 10, true, true, false,false);
+    printP(barra,td_f,tr_f); 
+    }
+  writeFooter(guardarexportar, false);
+  serversend200();
+}
+
+void ICACHE_FLASH_ATTR setupSegHTML()
+{
+  if (!autOK()) { sendOther(loghtm,-1); return; }
+  msg=vacio;
+  mp=1;
+  char passDevtemp1[20];
+  char passDevtemp2[20];
+  if (server.method()==HTTP_POST)
+    {
+    conf.usepassDev = 0;
+    for (int i=0; i<server.args(); i++)
+      {
+      calcindices(i);
+      if (param_number==0) conf.usepassDev = server.arg(i).toInt();
+      else if (param_number==1) server.arg(i).toCharArray(conf.userDev, 20);
+      else if (param_number==2) server.arg(i).toCharArray(passDevtemp1, 20);
+      else if (param_number==3) server.arg(i).toCharArray(passDevtemp2, 20);
+      }
+    if (conf.usepassDev)    // contraseña activa
+      {
+      if (strcmp(passDevtemp1, passDevtemp2)==0)   // si coinciden ambas password se almacena
+        strcpy(conf.passDev, passDevtemp1);
+      else
+        conf.usepassDev=0; // no se guarda y se desactiva contraseña
+      }
+    else    // contraseña NO activa
+      if (strcmp(passDevtemp1, conf.passDev) != 0)  // si no se da la contraseña correcta, no se desactiva
+        conf.usepassDev = 1;
+    saveconf();
+    sendOther(sshtm,-1); return;
+    }
+
+  /////////////////////
+  writeHeader(false,false);
+  writeMenu(4, 5);
+  writeForm(sshtm);
+
+  printP(tr, td, t(autenticacion), td_f, conf.usepassDev ? th : td);
+  checkBox(0, conf.usepassDev,false);
+  if (conf.usepassDev) printP(th_f, tr_f); else printP(td_f, tr_f);
+  printparCP(t(usuario), 1, conf.userDev, 20, false);
+  printparCP(t(contrasena), 2, "", 20, true);
+  printparCP(t(confcontrasena), 3, "", 20, true);
+  writeFooter(guardar, false);
+  serversend200();
+}
+
+void ICACHE_FLASH_ATTR scanapHTML()
+{
+  nAPact=0;
+  nAP=WiFi.scanNetworks(false, false);
+  msg=vacio;
+  writeHeader(false,false);
+  printP(menor,table, b);
+  printP(c(tclass), ig, tnormal, mayor);
+
+  for (int i=0; i<nAP; i++)
+  {
+    WiFi.SSID(i).toCharArray(auxchar, 20);
+    printP(tr, td);
+    printP(href_i, syhtm,interr,letran,ig);
+    printI(i);
+    printP(amper, letras,letrai, ig, cero, mayor);
+    printP(auxchar, td_f, td);
+    printI(WiFi.RSSI(i));
+    printP(b, c(dbm), td_f, tr_f);
+  }
+  printP(menor, barra, table, mayor);  
+  printP(c(body_f), menor, barra);
+  printP(thtml, mayor);
+  serversend200();
+}
+
+void initupdateserver()
+{
+  server.on("/firm", HTTP_GET, []() {
+    server.sendHeader("Connection", "close");
+    server.send(200, "text/html", serverIndex);
+  });
+  server.on("/update", HTTP_POST, []() {
+    server.sendHeader("Connection", "close");
+    server.send(200, "text/plain", (Update.hasError())?"FAIL":"OK");
+    ESP.restart();
+  }, []() {
+    HTTPUpload& upload = server.upload();
+    if (upload.status == UPLOAD_FILE_START) {
+      Serial2.setDebugOutput(true);
+      Serial2.printf("Update: %s\n", upload.filename.c_str());
+      clearTFT();
+      tft.setTextSize(2);
+      tft.drawString("Updating firmware...",0,20);
+      tft.drawString("No apagar el equipo",0,60);
+      if (!Update.begin()) { //start with max available size
+        Update.printError(Serial2);
+      }
+    } else if (upload.status == UPLOAD_FILE_WRITE) {
+      if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
+        Update.printError(Serial2);
+      }
+    } else if (upload.status == UPLOAD_FILE_END) {
+      if (Update.end(true)) { //true to set the size to the current progress
+        Serial2.printf("Update Success: %u\nRebooting...\n", upload.totalSize);
+      } else {
+        Update.printError(Serial);
+      }
+      Serial2.setDebugOutput(false);
+    }
+  });
+}
+
+void ICACHE_FLASH_ATTR espsysHTML()
+{
+  msg=vacio;
+  writeHeader(false,false);
+  writeMenu(4, 4);
+  printP(menor,table, b);
+  printP(c(tclass), ig, tnormal, mayor);
+  printP(tr, td, c(Time), td_f, td); printtiempo(millis() / 1000); printP(td_f, tr_f);
+//  printP(tr, td, c(Chipid), td_f, td); printL(system_get_chip_id()); printP(td_f, tr_f);
+//  printP(tr, td, c(ChipFlashSize), td_f, td);  printL(ESP.getFlashChipRealSize()); printP(td_f, tr_f);
+//  printP(tr, td, c(Chipspeed), td_f, td);  printL(ESP.getFlashChipSpeed()); printP(td_f, tr_f);
+//  printP(tr, td, c(sdkversion), td_f, td); printP(system_get_sdk_version()); printP(td_f, tr_f);
+//  printP(tr, td, c(vdd33), td_f, td); printL(system_get_vdd33()); printP(td_f, tr_f);
+//  printP(tr, td, c(adc_read), td_f, td); printL(system_adc_read()); printP(td_f, tr_f);
+//  printP(tr, td, c(boot_version), td_f, td); printL(system_get_boot_version());   printP(td_f, tr_f);
+//  printP(tr, td, c(Time), td_f, td); printI(conf.wifimode); printP(td_f, tr_f);
+//  printP(tr, td, c(boot_mode), td_f, td); printI(system_get_boot_mode());   printP(td_f, tr_f);
+//  printP(tr, td, c(userbin_addr), td_f, td); printL(system_get_userbin_addr());   printP(td_f, tr_f);
+//  printP(tr, td, c(cpu_freq), td_f, td); printL(system_get_cpu_freq());   printP(td_f, tr_f);
+//  printP(tr, td, c(flash_get_id), td_f, td); printL(spi_flash_get_id());   printP(td_f, tr_f);
+//  printP(tr, td, c(opmode), td_f, td); printI(wifi_get_opmode());   printP(td_f, tr_f);
+//  printP(tr, td, c(opmode_default), td_f, td); printI(wifi_get_opmode_default());   printP(td_f, tr_f);
+//  printP(tr, td, c(auto_connect), td_f, td); printI(wifi_get_opmode());   printP(td_f, tr_f);
+//  printP(tr, td, c(sleep_type), td_f, td); printI(wifi_get_sleep_type());   printP(td_f, tr_f);
+//  printP(tr, td, c(broadcast_if), td_f, td); printI(wifi_get_broadcast_if());   printP(td_f, tr_f);
+//  printP(tr, td, c(user_limit_rate_mask), td_f, td); printL(wifi_get_user_limit_rate_mask());   printP(td_f, tr_f);
+//  printP(tr, td, c(channelt), td_f, td); printI(wifi_get_channel());   printP(td_f, tr_f);
+//  printP(tr, td, c(dhcps_status), td_f, td); printI(wifi_softap_dhcps_status());   printP(td_f, tr_f);
+//  printP(tr, td, c(phy_mode), td_f, td); printI(wifi_get_phy_mode());   printP(td_f, tr_f);
+  if (conf.wifimode!=1)
+    {
+//    printP(tr, td, c(connect_status), td_f, td); printI(wifi_station_get_connect_status());   printP(td_f, tr_f);
+//    printP(tr, td, c(hostnamet), td_f, td); printP(wifi_station_get_hostname());   printP(td_f, tr_f);
+//    printP(tr, td, c(station_num), td_f, td); printI(wifi_softap_get_station_num());   printP(td_f, tr_f);
+//    printP(tr, td, c(get_current_ap_id), td_f, td); printI(wifi_station_get_current_ap_id());   printP(td_f, tr_f);
+    }
+  printP(menor, barra, table, mayor);  
+  printP(c(body_f), menor, barra);
+  printP(thtml, mayor);
+  serversend200();
+}
+
+void ICACHE_FLASH_ATTR loginHTML()
+{
+  msg=vacio;
+  if (server.method()==HTTP_POST)
+    {
+    if (server.hasArg("0") && server.hasArg("1"))
+      {
+      if ((server.arg(0)==conf.userDev) && (server.arg(1)==conf.passDev))
+        { setCookie(1);  return; }
+      }
+    }
+  if (server.hasArg("DISCONNECT")) { setCookie(0); return; }
+
+  writeHeader(false,false);
+  pc(body_i);
+  pc(form_action);
+  printP(loghtm,comillas,b);
+  pc(Form_post);
+  printP(menor,table,b);
+  printP(c(tclass), ig, tnormal, mayor);
+  printparCP(t(usuario), 0, conf.userDev, 20, false);
+  printparCP(t(contrasena), 1, "", 20, true);
+  printP(menor, barra, table, mayor);
+  printP(menor, c(tinput), b, type, ig, comillas);
+  printP(submit, comillas, b, tvalue, ig, comillas);
+  printP(tguardar, comillas, mayor);
+  printP(menor, barra, c(tinput), mayor);
+  pc(form_f);
+  pc(body_f);
+  printP(menor, barra, thtml, mayor);
+  serversend200();
+}
+
+void initFab(void)
+{
+  dPrint(t(reiniciando)); dPrint(b); dPrint(t(fabrica)); dPrint(crlf);
+ // initConf();                  // variables de estructura Conf
+  resetWiFi();                 // WiFi y Red
+ // initPRG();                   // PROGRAMAS
+  saveconf();
+}
+
+void ICACHE_FLASH_ATTR resetHTML()
+{
+  msg=vacio;
+  if (server.method() == HTTP_POST)
+    {
+    for (int i=0; i<server.args(); i++)
+      {
+      if (server.argName(i).toInt()==0)
+        {
+        boolean idaccion = server.arg(i).toInt();
+        if (idaccion > 0)
+          {
+          writeHeader(false,false);
+          server.sendHeader("Connection", "close");
+          server.sendHeader("Access-Control-Allow-Origin", "*");
+          server.send(200, "text/html", espere);
+          if (idaccion==1)      { ESP.restart(); }
+          else if (idaccion==2) { ESP.restart(); }
+          else if (idaccion==3) { resetWiFi();  }
+          else if (idaccion==4) { initFab(); ESP.restart(); }
+          }
+        }
+      }
+    return;
+    }
+  writeHeader(false,false);
+  writeMenu(4, 2);
+  writeForm(rshtm);
+  printP(tr);
+  printP(td, treset, barra);
+  printP(trestart, td_f);
+  printcampoCB(0, 0, nohacernada, treset, trestart, tresetwifi,tresetfab,true);
+  printP(tr_f);
+  writeFooter(ejecutar, false);
+  serversend200();
+}
+
+void initHTML()
+{
+  server.onNotFound (htmlNotFound);
+  initupdateserver();
+ // server.on("/f", filesHTML);
+ // server.on("/sy", systemHTML);
+  
+  /**if (!checkfiles()) { server.on("/", filesHTML); return;  }*/
+  server.on("/", indexHTML);
+  server.on("/p", panelHTML);
+  server.on("/sd", setupDevHTML);
+  server.on("/sne", setupNetHTML);
+  server.on("/sc", scanapHTML);
+  server.on("/sns", setupNetServHTML);
+  server.on("/es", espsysHTML);
+  server.on("/l", loginHTML);
+  server.on("/ss", setupSegHTML);
+  server.on("/rs", resetHTML);
+/* server.on("/dw", downloadHTML);
+  server.on("/j", jsonHTML);
+  server.on("/jc", jsonconfHTML);
+  server.on("/je", jsonextHTML);
+  server.on("/on", onCmd);
+  server.on("/of", offCmd);**/
+  /**server.on("/rj", rjsonHTML);
+  server.on("/rjc", rjsonconfHTML);
+  server.on("/rf", setuprfHTML);
+  server.on("/sbp", setupbyPanelHTML);
+  server.on("/sdr", setupDevRemHTML);
+  server.on("/sdrio", setupDevRemioHTML);
+  server.on("/se", setupEscHTML);
+  server.on("/sf", setupFecHTML);
+  server.on("/sio", setupioHTML);
+  server.on("/sp", setupPanelHTML);
+  server.on("/spr", setupPrgHTML);
+  server.on("/sr", setupremHTML);
+  server.on("/s150", setupdev150HTML);
+  server.on("/ssr", setupsalremHTML);
+  server.on("/sse", setupSemHTML);
+  server.on("/sv", setupEveHTML);
+  server.on("/swc", setupWebCallHTML);
+  server.on("/t", termostatoHTML);
+  server.on("/v", voicecommandHTML);
+  
+  server.on("/l0", handleState0In);     // Entrada digital 0
+  server.on("/l1", handleState1In);     // Entrada digital 1
+  server.on("/l2", handleState2In);     // Entrada digital 2
+  server.on("/l3", handleState3In);     // Entrada digital 3
+  server.on("/l4", handleState0Out);    // Salida digital 0
+  server.on("/l5", handleState1Out);    // Salida digital 1
+  server.on("/l6", handleState2Out);    // Salida digital 2
+  server.on("/l7", handleState3Out);    // Salida digital 3
+  server.on("/l8", handleState4Out);    // Salida digital 4
+  server.on("/l9", handleState5Out);    // Salida digital 5
+  server.on("/l10", handleState6Out);   // Salida digital 6
+  server.on("/l11", handleState7Out);   // Salida digital 7
+
+  server.on("/gi0", handleState0Ing);     // Entrada digital gpio 0
+  server.on("/gi1", handleState1Ing);     // Entrada digital gpio 1
+  server.on("/gi2", handleState2Ing);     // Entrada digital gpio 2
+  server.on("/gi3", handleState3Ing);     // Entrada digital gpio 3
+  server.on("/gi4", handleState4Ing);     // Entrada digital gpio 4
+  server.on("/gi5", handleState5Ing);     // Entrada digital gpio 5
+  server.on("/gi6", handleState6Ing);     // Entrada digital gpio 6
+  server.on("/gi7", handleState7Ing);     // Entrada digital gpio 7
+  server.on("/gi8", handleState8Ing);     // Entrada digital gpio 8
+  server.on("/gi9", handleState9Ing);     // Entrada digital gpio 9
+
+  server.on("/go0", handleState0Outg);     // Salida digital gpio 0
+  server.on("/go1", handleState1Outg);     // Salida digital gpio 1
+  server.on("/go2", handleState2Outg);     // Salida digital gpio 2
+  server.on("/go3", handleState3Outg);     // Salida digital gpio 3
+  server.on("/go4", handleState4Outg);     // Salida digital gpio 4
+  server.on("/go5", handleState5Outg);     // Salida digital gpio 5
+  server.on("/go6", handleState6Outg);     // Salida digital gpio 6
+  server.on("/go7", handleState7Outg);     // Salida digital gpio 7
+  server.on("/go8", handleState8Outg);     // Salida digital gpio 8
+  server.on("/go9", handleState9Outg);     // Salida digital gpio 9
+  
+  server.on("/r0", handleStater0);
+  server.on("/r1", handleStater1);
+  server.on("/r2", handleStater2);
+  server.on("/r3", handleStater3);
+  server.on("/r4", handleStater4);
+  server.on("/r5", handleStater5);
+  server.on("/r6", handleStater6);
+  server.on("/r7", handleStater7);
+  server.on("/r8", handleStater8);
+  server.on("/r9", handleStater9);
+  server.on("/r10", handleStater10);
+  server.on("/r11", handleStater11);
+  server.on("/r12", handleStater12);
+  server.on("/r13", handleStater13);
+  server.on("/r14", handleStater14);
+  server.on("/r15", handleStater15);
+  
+  server.on("/te0", handleStateTemp0);       // temperaturas
+  server.on("/te1", handleStateTemp1);       // temperaturas
+  server.on("/te2", handleStateTemp2);       // temperaturas
+  server.on("/te3", handleStateTemp3);       // temperaturas
+  server.on("/te4", handleStateTemp4);       // temperaturas
+  server.on("/te5", handleStateTemp5);       // temperaturas
+  server.on("/te6", handleStateTemp6);       // temperaturas
+  server.on("/te7", handleStateTemp7);       // temperaturas
+
+  server.on("/ge0", handleStateTemp0g);       // temperaturas
+  server.on("/ge1", handleStateTemp1g);       // temperaturas
+  server.on("/ge2", handleStateTemp2g);       // temperaturas
+  server.on("/ge3", handleStateTemp3g);       // temperaturas
+  server.on("/ge4", handleStateTemp4g);       // temperaturas
+  server.on("/ge5", handleStateTemp5g);       // temperaturas
+  server.on("/ge6", handleStateTemp6g);       // temperaturas
+  server.on("/ge7", handleStateTemp7g);       // temperaturas
+  server.on("/ge8", handleStateTemp8g);       // temperaturas
+  server.on("/ge9", handleStateTemp9g);       // temperaturas
+
+  server.on("/tt", handleStateTime);       // Pie*/
+}

@@ -110,6 +110,7 @@
 
 extern char auxc[30];
 extern char auxb[30];
+extern void clearTFT(void);
 
 #endif    //end of if header define
 

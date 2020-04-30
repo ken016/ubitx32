@@ -19,6 +19,12 @@ template <class T> int EEPROM_readAnything(int ee, T& value)
 
 boolean strcharcomp() { msg.toLowerCase(); msg.toCharArray(auxdesc, msg.length()+1); return (strcmp(auxchar,auxdesc)==0); }
 
+void ICACHE_FLASH_ATTR dPrint(String texto) { Serial2.print(texto); }
+void ICACHE_FLASH_ATTR dPrint(char* texto) { Serial2.print(texto); }
+void ICACHE_FLASH_ATTR dPrint(PGM_P texto)  { Serial2.print(texto); }
+void ICACHE_FLASH_ATTR dPrintI(int valor)   { Serial2.print(valor); }
+
+
 char* ICACHE_FLASH_ATTR readdescr(char* namefile, byte ind, byte len)
 {
   File auxfile=SPIFFS.open(namefile,letrar);
@@ -292,15 +298,36 @@ void ICACHE_FLASH_ATTR printOpc(boolean colorea, boolean activa, PGM_P texto, PG
   }
 }
 
-void ICACHE_FLASH_ATTR writeMenu(byte opcprin, byte opcsec)
+void ICACHE_FLASH_ATTR resetWiFi(void)
+{
+  dPrint(t(reiniciando)); dPrint(b); dPrint(c(twifi)); dPrint(crlf);
+  conf.wifimode = 1;                  // AP
+  strcpy(conf.ssidSTA, c(tssid)); strcat(conf.ssidSTA, subray); strcat(conf.ssidSTA, sta);
+  strcpy(conf.passSTA, c(tpass)); strcat(conf.passSTA, subray); strcat(conf.passSTA, sta);
+  strcpy(conf.ssidAP, "UBITX"); strcat(conf.ssidAP, subray); strcat(conf.ssidAP, conf.CallSign);
+  strcpy(conf.passAP, t12341234);
+  conf.canalAP=3;
+  for (byte i=0; i<6; i++) strcpy(conf.EEmac[i], vacio);
+  conf.staticIP = 1;
+  conf.EEip={192,168,1,149};  
+  conf.EEmask={255,255,255,0};
+  conf.EEgw={192,168,1,1};
+  conf.EEdns={8,8,8,8};
+  conf.EEdns={8,8,4,4};
+  conf.webPort=88;
+  strcpy(conf.hostmyip,c(icanhazip));
+  saveconf();
+}
+
+void writeMenu(byte opcprin, byte opcsec)
 {
   printP(c(body_i), menor);
   printP(table, b);
   printP(c(tclass));
   printP(ig, tmenu, mayor, tr); // formato menú
-  printOpc(false, (opcprin==1), t(zonas), panelhtm); // PANEL
+  printOpc(false, (opcprin==1), c(panel), panelhtm); // PANEL
   printOpc(false, (opcprin==3), t(configuracion), sdhtm); // CONFIGURACIÓN
-  printOpc(false, (opcprin==2), t(programas), sprghtm); // Programas
+  //printOpc(false, (opcprin==2), t(programas), sprghtm); // Programas
   printOpc(false, (opcprin==4), t(sistema), espsyshtm); // Sistema
 
   if (conf.usepassDev)
@@ -331,14 +358,9 @@ void ICACHE_FLASH_ATTR writeMenu(byte opcprin, byte opcsec)
   else if (opcprin==3) // CONFIGURACIÓN
     {
     printOpc(false, opcsec==0, t(dispositivo), sdhtm);
-    printOpc(false, opcsec==5, t(zonas), sphtm);
-    printOpc(false, opcsec==2, t(mandorf), rfhtm);
     printOpc(false, opcsec==3, t(tred), snehtm);
     printOpc(false, opcsec==4, t(servred), snshtm);
     printOpc(false, opcsec==1, c(senales), siohtm);
-    printOpc(false, opcsec==10, t(remotos), slkhtm);
-    printOpc(false, opcsec==11, c(salremotas), sremhtm);
-    printOpc(false, opcsec==12, t(bombacalor), sbhtm);
     }
   else if (opcprin==4) // SISTEMA
     {

@@ -66,6 +66,8 @@ typedef struct {int devori; int actualizaut; float s[3]; float a1; char ua1[4]; 
                   IPAddress EEmask={255,255,255,0}; // 4 bytes, máscara de subred
                   IPAddress EEdns={8,8,8,8};        // 4 bytes, servidor DNS primario
                   IPAddress EEdns2={8,8,4,4};       // 4 bytes, servidor DNS secundario
+                  char EEmac[6][3];                 // 18 bytes, MAC
+                  char myippub[16]="";              // 16 bytes, dirección IP pública
                   byte staticIP=1;                  // 1 byte, IP estática Sí/No
                   boolean ftpenable=true;
                   int webPort=88;                   // 2 bytes, puerto servidor web
@@ -77,6 +79,23 @@ typedef struct {int devori; int actualizaut; float s[3]; float a1; char ua1[4]; 
                   byte rstper=0;   
                   byte usepassDev=0;                // 1 byte, 0 no usar password,  1 usar password
                   uint8_t probecode[maxTemp][8];            // código de sonda 
+                  char userDev[20]="admin";         // 20 bytes, usuario device
+                  char passDev[20]="admin";         // 20 bytes, password device
+                  byte iftttenabled=0;
+                  char iftttkey[30]="";             // 30 bytes, ifttt key
+                  byte iottweetenable=0;
+                  char iottweetuser[10]="";         // 10 bytes, IoTtweet account user ID
+                  char iottweetkey[15]="";          // 15 bytes, IoTtweet account key
+                  byte mqttenabled=0;
+                  char mqttserver[40]="";           // MQTT broker
+                  char mqttpath[6][10]={"","","","","",""};       // MQTT path
+                  byte dweetenabled=0;                 // 1 byte, dweet.io desactivado
+                  byte myjsonenabled=0;
+                  char idmyjson[10]="";             // 10 bytes, ID myjson
+                  byte idmyjsonST=0;                // 1 byte, indica si se ha obtenido y almacenado ya la ID de myjson
+                  char hostmyip[30]="icanhazip.com";// 30 bytes, URL del servidor de IP pública
+                  long freqbyband[MAX_LIMIT_RANGE]={1810000,3500000,5351000,7000000,10100000,14000000,18068000,21000000,24890000,28000000};
+                
 } conftype;
     conftype conf;
     byte *buffconf = (byte *) &conf; // acceder a conf como bytes
@@ -126,7 +145,7 @@ unsigned long tempdesgpio[maxSD];   // 10x4, 40 bytes, tiempos desde desactivaci
 byte tipoEDtemp[maxED]={0,0,0,0};   // 4x1, 4 bytes, tipo de la entrada digital: 0=ON/OFF, 1=OFF/ON, 2=DHT11,3=DHT21,4=DHT22,5=RS485 RX/TX, ...
 int nAP=0;                      // 2 bytes, redes encontradas con scanAP
 int nAPact=0;                   // 2 bytes, redes actual
-int countfaulttime=29999;       // veces que ha fallado la sincronización
+unsigned long countfaulttime=29999;       // veces que ha fallado la sincronización
 int param_number=0;             // variables auxiliares para parámetros en POST
 int indice=0;                   // variables auxiliares para parámetros en POST
 int resto=0;                    // variables auxiliares para parámetros en POST
