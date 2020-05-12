@@ -3,7 +3,6 @@
     
 PGM_P(htmlHead_3)=  
     "<meta name=\"viewport\" content=\"width=device-width initial-scale=1\"/>"
-//    "<meta http-equiv=\"Content-Type\" content=\"text/html charset=utf-8\"/>"
     "<meta http-equiv=\"Content-Type\" content=\"text/html charset=ISO-8859-1\"/>"
     
     "<style type=\"text/css\"> a:link { text-decoration:none; }"    // quita subrayado de enlaces
@@ -66,7 +65,6 @@ PGM_P(sbphtm)="sbp";
 PGM_P(rfhtm)="rf";
 PGM_P(rohtm)="ro";
 PGM_P(sdremhtm)="sdr";
-PGM_P(sdrem150htm)="s150";
 PGM_P(sdremiohtm)="sdrio";
 PGM_P(suhtm)="firm";
 PGM_P(rshtm)="rs";
@@ -228,8 +226,6 @@ PGM_P(ups)="PgUp";
 PGM_P(downs)="PgDn";
 PGM_P(lefts)="LF";
 PGM_P(rigths)="RT";
-PGM_P(tconuco)="conuco 8266";
-PGM_P(tconuco32)="conuco 32";
 
 ///////////////////////////////
 
@@ -237,10 +233,6 @@ PGM_P(tconuco32)="conuco 32";
 PGM_P(aa)="aa";
 PGM_P(DV)="DV";
 PGM_P(ua0)="ua0";
-//PGM_P(el0)="e0";
-//PGM_P(el1)="e1";
-//PGM_P(sl0)="s0";
-//PGM_P(sl1)="s1";
 PGM_P(tel0)="te0";
 PGM_P(tel1)="te1";
 PGM_P(tsl0)="ts0";
@@ -253,13 +245,4 @@ PGM_P(thtml)="html";
 PGM_P(io)="I/O";
 PGM_P(ID)="ID";
 PGM_P(ok)="OK";
-
-/// Sensores
-//PGM_P(BM1750)="BM1750";
-//PGM_P(BMP085)="BMP085";
-//PGM_P(DHT12)="DHT12";
-//PGM_P(INA219)="INA219";
-//PGM_P(PCF8551)="PCF8551";
-//PGM_P(PN532)="PN532";
-//PGM_P(SoilMisture)="Soil Misture";
 

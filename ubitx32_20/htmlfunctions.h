@@ -30,7 +30,6 @@ void ICACHE_FLASH_ATTR pt(int pos)
   printP(auxdesc);
 }
 
-
 void ICACHE_FLASH_ATTR pc(int pos)
 {
   File auxfile=SPIFFS.open(filecommon,letrar);
@@ -280,6 +279,36 @@ void ICACHE_FLASH_ATTR tituloFila(PGM_P texto, int num, PGM_P letra, int indice)
   printPiP(b, num, td_f);
 }
 
+int ICACHE_FLASH_ATTR getMyIP()
+{
+  msg=vacio;
+  printP(barra);
+  HTTPClient http;
+  Serial2.print("hostmyip:"); Serial2.println(conf.hostmyip);
+  http.begin(conf.hostmyip, 80, msg);
+//  http.setConnectTimeout(conf.timeoutNTP);
+  http.setConnectTimeout(1000);
+  Serial2.print("getMyIP:");Serial2.print("host:");Serial2.println(conf.hostmyip);
+  int httpCode=http.GET();
+  Serial2.print(" ");Serial2.println(httpCode);
+  if (httpCode > 0) {
+    if (httpCode == HTTP_CODE_OK) { msg=http.getString(); msg.toCharArray(conf.myippub, msg.length());  } }
+  http.end();
+  msg=vacio;
+  return httpCode;
+}
+
+int ICACHE_FLASH_ATTR checkMyIP()
+{
+  char auxip[16];
+  strcpy(auxip, conf.myippub);
+  getMyIP();    // busca actual y la guarda en conf.txt
+  if (strcmp(conf.myippub, auxip) != 0) // son diferentes
+    {
+    saveconf();
+//    if (conf.iftttenabled) ifttttrigger(conucochar, conf.iftttkey, conf.aliasdevice, "NewIP", conf.myippub);
+    }
+}
 
 void printTime()
 {
@@ -291,7 +320,7 @@ void printTime()
 
 void ICACHE_FLASH_ATTR HtmlGetStateTime()
 {
-  printColspan(2);
+  printColspan(3);
   printTime();
   printP(b, c(PRG), b);
   printI(ESP.getFreeHeap());
@@ -379,20 +408,28 @@ void panelHTML() {
   writeHeader(false,true);
   byte auxI=server.arg(0).toInt();
   writeMenu(1, auxI);
-  printP(menor, table);
-  printP(b, "class", ig, tpanel, mayor);
-  printP(tr);
-  printColspan(2);
+  printP(menor, table,b);
+  printP("class", ig, tpanel, mayor,tr);
   
   /////////////  CONTENIDO   ///////////
+  printColspan(3);
   printP("uBitx", td_f, tr_f);
-  printP(tr,td,"VFO",td_f,td); printP(conf.vfoActive==VFO_A?"A":"B"); printP(td_f, tr_f);
-  printP(tr,td,"Mode",td_f,td); printP(conf.isUSB==1?"USB":"LSB"); printP(td_f, tr_f);
-  printP(tr,td,"CW",td_f,td); printP(conf.cwMode>=1?"ON":"OFF"); printP(td_f, tr_f);
-  printP(tr,td,"RIT",td_f,td); printP(conf.ritOn>=1?"ON":"OFF"); printP(td_f, tr_f);
-  printP(tr,td,"SPL",td_f,td); printP(conf.splitOn>=1?"ON":"OFF"); printP(td_f, tr_f);
-  printP(tr,td,"Frequency",td_f,td); printI(conf.frequency); printP(td_f, tr_f);
-
+  printP(tr,td,"VFO",td_f,td); printP(conf.vfoActive==VFO_A?"A":"B"); printP(td_f,td,td_f, tr_f);
+  printP(tr,td,"Mode",td_f,td); printP(conf.isUSB==1?"USB":"LSB"); printP(td_f,td,td_f, tr_f);
+  printP(tr,td,"CW",td_f,td); printP(conf.cwMode>=1?"ON":"OFF"); printP(td_f,td,td_f, tr_f);
+  printP(tr,td,"RIT",td_f,td); printP(conf.ritOn>=1?"ON":"OFF"); printP(td_f,td,td_f, tr_f);
+  printP(tr,td,"SPL",td_f,td); printP(conf.splitOn>=1?"ON":"OFF"); printP(td_f,td,td_f, tr_f);
+  printP(tr,td,td_f,td); printP("VFO A",td_f, td,"VFO B",td_f,tr_f);
+  printP(tr,td,"Frequency",td_f,td); 
+  printI(conf.frequencyA); printP(td_f,td);
+  printI(conf.frequencyB); printP(td_f,tr_f);
+  for (byte i=0;i<MAX_BANDS;i++)
+    {
+    printP(tr,td,"Band ",conf.hamBandName[i],b);
+    printP(letram,td_f,td); 
+    printI(conf.freqbyband[i][0]); printP(td_f, td);
+    printI(conf.freqbyband[i][1]); printP(td_f, tr_f);
+    }
   // final
   printP(menor,letrat,letrar,b,c(tid));
   printP(ig,comilla,letrat,letrat,comilla,mayor);
@@ -441,7 +478,10 @@ void setupDevHTML()
   writeMenu(3, 0);
   writeForm(sdhtm);
 
-  printparCP("CALLSIGN", 0, conf.CallSign, 19, false);
+  printP(tr,td,"CALLSIGN",td_f);
+  printcampoC(0, conf.CallSign, 19, true, true, false, true);
+  printP(td,td_f,tr_f);
+
   printP(tr,td,"Calibration/usbCarrier",td_f); 
   printcampoL(1, conf.calibration, 10, true, true);
   printcampoL(2,  conf.usbCarrier, 10, true, true); 
@@ -457,22 +497,61 @@ void setupDevHTML()
 
   printP(tr, td, t(idioma),td_f);
   printcampoCB(5, conf.lang, PSTR("Español"), PSTR("English"),true); 
-  printP(td_f,tr_f);
+  printP(td_f,td,td_f,tr_f);
 
   printP(tr,td,"CW Speed"); 
-  printcampoI(6, conf.cwSpeed, 5, true, true); printP(td_f,tr_f);
+  printcampoI(6, conf.cwSpeed, 5, true, true); printP(td_f,td,td_f,tr_f);
   printP(tr,td,"cwDelayTime"); 
-  printcampoI(7, conf.cwDelayTime, 5, true, true); printP(td_f,tr_f);
+  printcampoI(7, conf.cwDelayTime, 5, true, true); printP(td_f,td,td_f,tr_f);
   printP(tr,td,"cwKeyType",td_f); 
-  printcampoCB(8, conf.cwKeyType, "straight", "iambica", "iambicb", true);
+  printcampoCB(8, conf.cwKeyType, "straight", "iambica", "iambicb", true); 
+  printP(td,td_f);
   printP(tr,td,"SI5351BX_ADDR"); 
-  printcampoI(9, conf.SI5351BX_ADDR, 5, true, true); printP(td_f,tr_f);
+  printcampoI(9, conf.SI5351BX_ADDR, 5, true, true); printP(td_f,td,td_f,tr_f);
   
 
   printP(tr, td, "Reset periodico (horas)",td_f,td);
   printcampoCB(99,conf.rstper,1,24,false); 
-  printP(td_f,tr_f);
+  printP(td_f,td,td_f,tr_f);
 
+  writeFooter(guardar, false);
+  serversend200();
+}
+
+void setupBandHTML()
+{
+  msg=vacio;
+  mp=1;
+  if (server.method()==HTTP_POST)
+    {
+    for (int i=0; i<server.args(); i++)
+      {
+      calcindices(i);
+      if (resto==0)
+        conf.hamBandRange[indice][0]=server.arg(i).toInt();
+      else if (resto==1)
+        conf.hamBandRange[indice][1]=server.arg(i).toInt();
+      }
+    saveconf();
+    readconf();
+    sendOther(sbhtm,-1);
+    return;
+    }
+
+  writeHeader(false,false);
+  writeMenu(3,2);
+  writeForm(sbhtm);
+  printP(tr,td,"Banda",td_f,td);
+  printP("desde",td_f,td," hasta   khz",td_f);
+  printP(tr_f);
+  for (byte i=0;i<MAX_BANDS;i++)
+    {
+    printP(tr);
+    printP(td,conf.hamBandName[i],b,letram,td_f); 
+    printcampoI(2*i, conf.hamBandRange[i][0], 10, true, true);
+    printcampoI(2*i+1, conf.hamBandRange[i][1], 10, true, true);
+    printP(tr_f);  
+    }
   writeFooter(guardar, false);
   serversend200();
 }
@@ -484,7 +563,7 @@ void ICACHE_FLASH_ATTR setupNetHTML()
   mp=1;
   if (server.method()==HTTP_POST)
     {
-    conf.staticIP=0;
+    conf.staticIP=0;conf.autoWiFi=0;
     for (int i = 0; i < server.args(); i++)
       {
       calcindices(i);
@@ -509,6 +588,7 @@ void ICACHE_FLASH_ATTR setupNetHTML()
       else if (param_number==46) { conf.staticIP = server.arg(i).toInt(); }
       else if (param_number>=47 && param_number <= 50) { conf.EEdns2[param_number - 47] = server.arg(i).toInt(); }
       else if (param_number==56) { conf.canalAP = server.arg(i).toInt()+1; }
+      else if (param_number==57) { conf.autoWiFi = server.arg(i).toInt(); }
       }
     //
     //    nAP = 0;
@@ -520,6 +600,10 @@ void ICACHE_FLASH_ATTR setupNetHTML()
   writeMenu(3, 3);
   writeForm(snehtm);
 
+  printP(tr, td, "Auto WiFi", td_f, conf.autoWiFi==1 ? th : td);
+  checkBox(57,conf.autoWiFi,false);
+  printP(conf.autoWiFi?th_f:td_f,tr_f);
+  
   printP(tr, td, t(Modo), b, td_f);
   printcampoCB(41, conf.wifimode, sta, ap, apsta,true);
   printP(tr_f);
@@ -833,7 +917,7 @@ void initupdateserver()
       clearTFT();
       tft.setTextSize(2);
       tft.drawString("Updating firmware...",0,20);
-      tft.drawString("No apagar el equipo",0,60);
+      tft.drawString("No apague el equipo",0,40);
       if (!Update.begin()) { //start with max available size
         Update.printError(Serial2);
       }
@@ -991,6 +1075,7 @@ void initHTML()
   server.on("/l", loginHTML);
   server.on("/ss", setupSegHTML);
   server.on("/rs", resetHTML);
+  server.on("/sb", setupBandHTML);
 /* server.on("/dw", downloadHTML);
   server.on("/j", jsonHTML);
   server.on("/jc", jsonconfHTML);

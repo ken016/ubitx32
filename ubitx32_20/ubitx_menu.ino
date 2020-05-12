@@ -1054,35 +1054,7 @@ void menuRitToggle(int btn){
     }
 }
 
-void setupBFO(){
-  int knob = 0;
-  unsigned long prevCarrier;
-  prevCarrier = conf.usbCarrier;
-  tft.drawString("Set BFO",0,130);
-  tft.drawString("Press TUNE to Save",0,170);
-  si5351bx_setfreq(0, conf.usbCarrier);
-  printCarrierFreq(conf.usbCarrier);
-  displayYN();
-  while (!btnDown()){
-    tft.fillRect(210, 80, 160, 20, TFT_BLACK);
-    tft.drawNumber(conf.usbCarrier,210,80);
-    knob = enc_read();
-    if (knob != 0)
-      conf.usbCarrier += 50 * knob;
-    else
-      continue; //don't update the frequency or the display
-    si5351bx_setfreq(0, conf.usbCarrier);
-    setFrequency(conf.frequency);
-    delay(100);
-  }
-  saveconf();
-  si5351bx_setfreq(0, conf.usbCarrier);          
-  setFrequency(conf.frequency);    
-  menuOn = 0; 
-}
-
 void setupFreq(){
-  Serial2.println("setupFreq");
   int knob = 0;
   int32_t prev_calibration;
   //round off the the nearest khz
@@ -1090,7 +1062,7 @@ void setupFreq(){
   setFrequency(conf.frequency);
   while (btnDown()) delay(100);
   delay(100);
-  tft.drawNumber(conf.calibration,210,50);
+  tft.drawNumber(conf.calibration,180,40);
   prev_calibration = conf.calibration;
   tft.drawString("You should have a signal",0,130);
   tft.drawString("exactly at      Khz",0,150);
@@ -1099,8 +1071,9 @@ void setupFreq(){
   displayYN();
   while (!btnDown())
     {
-    tft.fillRect(210, 50, 160, 20, TFT_BLACK);
-    tft.drawNumber(conf.calibration,210,50);
+    tft.fillRect(190, 40, 160, 30, TFT_BLACK);
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    tft.drawNumber(conf.calibration,180,40);
     knob = enc_read();
     if (knob != 0)
       conf.calibration += knob * 875;
@@ -1116,6 +1089,34 @@ void setupFreq(){
   setFrequency(conf.frequency);    
   //debounce and delay
   while(btnDown()) delay(50); delay(100);
+}
+
+void setupBFO(){
+  int knob = 0;
+  unsigned long prevCarrier;
+  prevCarrier = conf.usbCarrier;
+  tft.drawNumber(conf.usbCarrier,180,70);
+  tft.drawString("Set BFO",0,130);
+  tft.drawString("Press TUNE to Save",0,170);
+  displayYN();
+  si5351bx_setfreq(0, conf.usbCarrier);
+  while (!btnDown()){
+    tft.fillRect(190, 70, 160, 30, TFT_BLACK);
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    tft.drawNumber(conf.usbCarrier,180,70);
+    knob = enc_read();
+    if (knob != 0)
+      conf.usbCarrier += 50 * knob;
+    else
+      continue; //don't update the frequency or the display
+    si5351bx_setfreq(0, conf.usbCarrier);
+    setFrequency(conf.frequency);
+    delay(100);
+  }
+  saveconf();
+  si5351bx_setfreq(0, conf.usbCarrier);          
+  setFrequency(conf.frequency);    
+  menuOn = 0; 
 }
 
 /**
@@ -1289,13 +1290,6 @@ void menuSetupCarrier(int btn){
   printLineF(1,F("PTT to confirm. "));
   delay_background(1000, 0);
 
-  //usbCarrier = 11995000l; //Remarked by KD8CEC, Suggest from many user, if entry routine factoryrest
-  /*
-  //for uBITX V5.0, but not used by KD8CEC, if you want default value of carrier on Calibration, delete remark symbols
-  usbCarrier = 11053000l;
-   */
-
-  
   si5351bx_setfreq(0, conf.usbCarrier);
   printCarrierFreq(conf.usbCarrier);
 

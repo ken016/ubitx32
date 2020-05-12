@@ -1,9 +1,5 @@
 
 ///////////////////////////////////////////////////////////////////////////////
-typedef struct {byte pro[6]; unsigned long code[6]; int len[6];} rftype;   // 42 bytes
-typedef struct {byte proon[18]; unsigned long codeon[18]; int lenon[18]; byte prooff[18]; unsigned long codeoff[18]; int lenoff[18];} code433type;   // 252 bytes
-typedef struct {int devori; int actualizaut; float s[3]; float a1; char ua1[4]; int di[2],ds[2]; 
-                long tdi[2],tdo[2]; char mac[13]; char idmyj[10]; float dhtdata[10][2]; } conucodata;
 /* Raduino needs to keep track of current state of the transceiver. These are a few variables that do it */
   typedef struct {    // datos configuración
                   boolean modeCalibrate = false;  //this mode of menus shows extended menus to calibrate the oscillators and choose the proper
@@ -41,9 +37,12 @@ typedef struct {int devori; int actualizaut; float s[3]; float a1; char ua1[4]; 
                   byte tuneTXType = 0;   //0 : use full range, 1 : just Change Dial speed, 2 : just ham band change, but can general band by tune, 3 : only ham band (just support 0, 2 (0.26 version))
                                          //100 : use full range but not TX on general band, 101 : just change dial speed but.. 2 : jut... but.. 3 : only ham band  (just support 100, 102 (0.26 version))
                   byte isShiftDisplayCWFreq = 1;  //Display Frequency 
-                  unsigned int hamBandRange[MAX_LIMIT_RANGE][2]=    // =  //Khz because reduce use memory
+                  unsigned int hamBandRange[MAX_BANDS][2]=    // =  //Khz because reduce use memory
                               {{1810,2000},{3500,3800},{5351,5367},{7000,7300},{10100,10150},
                                {14000,14350},{18068,18168},{21000,21450},{24890,24999},{28000,29700}};
+                  long freqbyband[MAX_BANDS][2]={{1810000,1810000},{3500000,3500000},{5351000,5351000},{7000000,7000000},{10100000,10100000},
+                                                 {14000000,14000000},{18068000,18068000},{21000000,21000000},{24890000,24890000},{28000000,28000000}};
+                  char hamBandName[MAX_BANDS][4]={"160","80","60","40","30","20","17","15","12","10"};
                   long LIBRE[5]={10,50,100,500,1000};
                   int ifShiftValue = 0;   //
                   byte sMeterLevels[9];
@@ -52,8 +51,10 @@ typedef struct {int devori; int actualizaut; float s[3]; float a1; char ua1[4]; 
                   char CallSign[20]="EA4GZI";
                   byte WsprMSGCount = 0;
                   unsigned long frequency=7150000;  //frequency is the current frequency on the dial
-                  unsigned long ritRxFrequency;  
-                  unsigned long ritTxFrequency;  
+                  unsigned long frequencyA=7150000;  //frequency is the current frequency VFOA
+                  unsigned long frequencyB=7150000;  //frequency is the current frequency VFOB
+                  unsigned long ritRxFrequency=7150000;  
+                  unsigned long ritTxFrequency=7150000;  
                   byte scaledSMeter = 0;
                   byte wifimode=2;    // default AP+STA
                   byte canalAP=3;      // 1 byte, canal ESP en modo AP
@@ -94,21 +95,30 @@ typedef struct {int devori; int actualizaut; float s[3]; float a1; char ua1[4]; 
                   char idmyjson[10]="";             // 10 bytes, ID myjson
                   byte idmyjsonST=0;                // 1 byte, indica si se ha obtenido y almacenado ya la ID de myjson
                   char hostmyip[30]="icanhazip.com";// 30 bytes, URL del servidor de IP pública
-                  long freqbyband[MAX_LIMIT_RANGE]={1810000,3500000,5351000,7000000,10100000,14000000,18068000,21000000,24890000,28000000};
-                
+                  byte actualBand=3;
+                  boolean autoWiFi=true;
 } conftype;
     conftype conf;
     byte *buffconf = (byte *) &conf; // acceder a conf como bytes
 
-    byte edPin[maxED]={I0,I1,I2,I3};                // pines entradas digitales
-    byte sdPin[maxSD]={O0,O1,O2,O3,O4,O5,O6,O7};    // pines salidas digitales/relés
-    const byte listgpiovar[maxgpiovar]={2,4,12,13,14,15,21,22,32,33};
-    const char idpin8266[15][4]={"t0","t1","t2","a0","e0","e1","s0","s1","id","ip","ipp","c0","c1","c2","all"}; // hasta el 8 son pines.
-    const char idpin[34][4]={"t0","t1","t2","t3","t4","t5","t6","t7","e0","e1","e2","e3","s0","s1","s2","s3","s4","s5","s6","s7","x1","x2","id","ip","ipp",
-                             "c0","c1","c2","c3","c4","c5","c6","c7","all"};
-        // hasta el 22 son pines
-    const char sensortype[maxsensortype][15]={"Input","Output","ADC","DAC","DHT","PT1000 JC-A99","NTC 10k Carel","ACS712","",
-                                              "","","","","","","","","","","","","","","","","","","",""};
+  typedef struct {    // datos memorias
+                  byte act[maxMem];         // activa o no
+                  byte vfoact[maxMem];      // VFO 
+                  unsigned long f[maxMem];  // frequency
+                  unsigned long ftxrit[maxMem];  // frequency TX Rit
+                  char callsign[maxMem][10]; // CallSign
+                  char descr[maxMem][20];   // descripción
+                  byte isUsb[maxMem];       // mode
+                  byte cwMode[maxMem];      // CW mode
+                  byte ritOn[maxMem];       // RIT
+                  byte splitOn[maxMem];     // SPL
+} mtype;
+    mtype m;
+    byte *buffm = (byte *) &m; // acceder a mem como bytes
+
+boolean inEntN=false;
+boolean inEntA=false;
+
 
 //////  tratamiento de bits /////////////////////
 const byte tab[8] = {1,2,4,8,16,32,64,128}; // 8
@@ -134,7 +144,6 @@ int peractpantemp=10;           // 2 período de actualización automática pág
 int peractremtemp=10;           // 2 período de actualización automática a nodo raíz
 byte bsumatAtemp[maxEA]={0};   // 1 byte,  mostrar sumaA temp
 int valoresTemp[maxTemp]={0,0,0,0,0,0,0,0}; // 8x2, 16 bytes guarda los valores de las sondas dividido por 100
-int tiporemotetemp=8266;
 byte nTemp=0;                  // número sondas detectadas en cada puerto 1-wire
 uint8_t addr1Wire[maxTemp][8];  // tiene los valores conectados
 unsigned long mact1,mact2,mact10,mact60,mact3600,mact86400; 
@@ -155,7 +164,7 @@ int mpi=0;                      // variables auxiliares para parámetros en POST
 boolean colorea;                // variables auxiliares para parámetros en POST
 long timerem[maxdevrem];        // tiempo en minutos desde última conexión con remoto
 boolean actirem[maxdevrem];     // 16 bytes, activo remoto
-long contaremote[maxsalrem];    // 32x4, 128 bytes, contadores o tiempo de encendido o apagado de señales remotas, en segundos
+long prooff[maxsalrem];    // 32x4, 128 bytes, contadores o tiempo de encendido o apagado de señales remotas, en segundos
 boolean actisenal[maxsalrem];   // 32 bytes, señales remotas activas
 char unitpinAtemp[4];           // 4 char, unidades entradas analógicas
 byte evenTemp[nEVE];            // 8 define la señal sobre la que se actua, variable temporal
@@ -167,7 +176,6 @@ int mbcons[16];                 // consignas remotos modbus
 byte mbstatus[2];               // estado relés remotos modbus (1 bit cada uno);
 byte bstatremote[4];            // 4 bytes, estado de cada posible salida remota
 byte tipoedremote[32];          // 32 bytes, tipo de cada posible entrada digital remota, 0=ON/OFF, 1=DHT
-float sondaremote[maxsalrem];   // 128 bytes, valores de sondas remotas
 
 char mac[14]="";                // MAC del dispositivo
 
@@ -176,7 +184,6 @@ char host[16]="";
 char hostraiz[16]="192.168.";
 byte NumOri=0;
 boolean statusChange=false;
-byte ListOri[16]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 float factorAtemp[maxEA]={1.0,1.0}; // 1x4 factor conversión analógicas locales temp
 float offsetAtemp[maxEA]={0.0,0.0}; // 1x4 offset conversión analógicas locales temp
 
@@ -236,7 +243,6 @@ byte hacerresetrem=0;
 long lastReconnectAttempt=0;
 boolean pendsave = false;
 boolean bmp085enabled=false;
-conucodata datosremoto;
 long lasttouch=0;
 boolean tfton=true;
 

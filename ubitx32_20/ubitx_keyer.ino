@@ -318,7 +318,7 @@ void cwKeyer(){
       isCWAutoMode = 1;                         //read status
 
     //Remoark Debug code / Serial Use by CAT Protocol
-    //Serial.print("paddle:");Serial.println(paddle);
+    //Serial2.print("paddle:");Serial2.println(paddle);
     // if we are here, it is only because the key or the paddle is pressed
     if (!inTx){
       keyDown = 0;

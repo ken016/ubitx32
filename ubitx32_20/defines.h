@@ -1,6 +1,6 @@
 
 
-#define MAX_LIMIT_RANGE 10  
+#define MAX_BANDS      10  
 #define WSPR_BAND_COUNT 3
 #define TX_SSB          0
 #define TX_CW           1
@@ -8,7 +8,7 @@
 #define VFO_A   16
 #define VFO_B   20
 
-
+#define maxMem 100
 
   #define modelo 32
   #define portdefault 88
@@ -37,30 +37,6 @@
   #define maxtftpages 6
   #define maxAP 9
   
-  // 
-  #define I0 36    // OK    // Inputs
-  #define I1 39    // OK  
-  #define I2 34    // OK  
-  #define I3 35    // OK  
-
-  #define O0 17    // OK  Outputs Relé 1
-  #define O1 23    // OK          Relé 2     
-  #define O2 25    // OK          Relé 3 a partir de PCB v4          
-  #define O3 27    // OK          Relé 4 a partir de PCB v4
-  #define O4 19    // OK    
-  #define O5 5     // OK          
-  #define O6 18    // OK            
-  #define O7 16    // OK          Relé 8
-  
-  #define W0 26    // 1 wire port 
-
-//  #define TX 1   // UART1 
-//  #define RX 3
-  #define RXD2 22  // UART2
-  #define TXD2 32
-  #define RX433 4 
-  #define TX433 2     
-
 ////////////////////////////////
 #define nEVE 8          // número de eventos
 #define despIFTTT 252   // valor para disparar IFTTT, 252
@@ -125,7 +101,7 @@
 #define Modo 52
 #define mostrarpines 53
 #define NO 54
-//#define nada 55
+#define bandas 55
 #define nombre 56
 #define notificar 57      // no usada
 #define notifttt 58

@@ -186,21 +186,8 @@ WebServer server(conf.webPort);
 #include "basicfunctions.h"            // include
 #include "htmlFunctions.h"             // include
 
-void showconf()
-{
-  Serial2.print("splitOn:"); Serial2.println(conf.splitOn);
-  Serial2.print("isUSB:"); Serial2.println(conf.isUSB);
-  Serial2.print("cwMode:"); Serial2.println(conf.cwMode);
-  Serial2.print("splitOn:"); Serial2.println(conf.splitOn);
-  Serial2.print("splitOn::"); Serial2.println(conf.splitOn);
-  Serial2.print("splitOn:"); Serial2.println(conf.splitOn);
-  Serial2.print("splitOn:"); Serial2.println(conf.splitOn);
-  Serial2.print("splitOn:"); Serial2.println(conf.splitOn);
-  Serial2.print("splitOn:"); Serial2.println(conf.splitOn);
-}
-
-
 boolean txCAT = false;        //turned on if the transmitting due to a CAT command
+boolean txTFT = false;        //turned on if the transmitting due to a TFT command
 byte inTx = 0;                //it is set to 1 if in transmit mode (whatever the reason : cw, ptt or cat)
 char keyDown = 0;             //in cw mode, denotes the carrier is being transmitted
 byte menuOn = 0;              //set to 1 when the menu is being displayed, if a menu item sets it to zero, the menu is exited
@@ -260,7 +247,7 @@ void setNextHamBandFreq(unsigned long f, int moveDirection)
     }
   else
     findedIndex = -1;
- 
+  if (findedIndex == -1) conf.actualBand=99; else conf.actualBand=findedIndex;
   //loadMode = (byte)(resultFreq >> 30);
   //resultFreq = resultFreq & 0x3FFFFFFF;
   loadMode = (byte)(resultFreq >> 29);
@@ -270,8 +257,13 @@ void setNextHamBandFreq(unsigned long f, int moveDirection)
     resultFreq = (unsigned long)(conf.hamBandRange[(unsigned char)findedIndex][0]) * 1000;
 
   byteToMode(loadMode, 1);
-  conf.isUSB=(resultFreq>=10000000);
-  setFrequency(resultFreq);
+  conf.isUSB=(resultFreq>=10000000)?1:0;
+  Serial2.print("resultfreq:"); Serial2.print(resultFreq);
+  Serial2.print("  isUSB:"); Serial2.println(conf.isUSB);
+  if (conf.actualBand != 99)
+    setFrequency(conf.freqbyband[conf.actualBand][conf.vfoActive==VFO_A?0:1]);
+  else
+    setFrequency(resultFreq);
   saveconf();
 }
 
@@ -352,171 +344,27 @@ void setFrequency(unsigned long f){
   setTXFilters(f);
   //alternative to reduce the intermod spur
   if (conf.isUSB){
-    if (conf.cwMode)
-      {
-      Serial2.print("f:"); Serial2.println(f);
-      Serial2.print("USB-CW   firstIF/f/sideTone/usbCarrier:");
-      Serial2.print(conf.firstIF); Serial2.print("/");
-      Serial2.print(f); Serial2.print("/");
-      Serial2.print(conf.sideTone); Serial2.print("/");
-      Serial2.print("CLK2/CLK1:"); Serial2.print(conf.firstIF  + f + conf.sideTone); 
-      Serial2.print("/"); Serial2.println(conf.firstIF + conf.usbCarrier); 
-      si5351bx_setfreq(2, conf.firstIF  + f + conf.sideTone);
-      }
-    else 
-      {
-      Serial2.print("f:"); Serial2.println(f);
-      Serial2.print("USB   firstIF/f/usbCarrier:");
-      Serial2.print(conf.firstIF); Serial2.print("/"); 
-      Serial2.print(f);  Serial2.print("/"); 
-      Serial2.println(conf.usbCarrier); 
-      Serial2.print("CLK2/CLK1:"); Serial2.print(conf.firstIF + f); 
-      Serial2.print("/"); Serial2.println(conf.firstIF + conf.usbCarrier); 
-      si5351bx_setfreq(2, conf.firstIF  + f);
-      }
+    if (conf.cwMode) { si5351bx_setfreq(2, conf.firstIF  + f + conf.sideTone);   }
+    else             { si5351bx_setfreq(2, conf.firstIF  + f);    }
     si5351bx_setfreq(1, conf.firstIF + conf.usbCarrier);
     }
   else{       // LSB
-    if (conf.cwMode)
-      {
-      Serial2.print("f:"); Serial2.println(f);
-      Serial2.print("LSB-CW   firstIF/f/sideTone/usbCarrier:");
-      Serial2.print(conf.firstIF); Serial2.print("/");
-      Serial2.print(f); Serial.print("/");
-      Serial2.print(conf.sideTone); Serial2.print("/");
-      Serial2.println(conf.usbCarrier); 
-      Serial2.print("CLK2/CLK1:"); Serial2.print(conf.firstIF  + f + conf.sideTone); 
-      Serial2.print("/"); Serial2.println(conf.firstIF - conf.usbCarrier); 
-      si5351bx_setfreq(2, conf.firstIF  + f + conf.sideTone);      
-      }
-    else 
-      {
-      Serial2.print("f:"); Serial2.println(f);
-      Serial2.print("LSB   firstIF/f/usbCarrier:");
-      Serial2.print(conf.firstIF); Serial2.print("/");
-      Serial2.print(f); Serial2.print("/");
-      Serial2.println(conf.usbCarrier); 
-      Serial2.print("CLK2/CLK1:"); Serial2.print(conf.firstIF + f); 
-      Serial2.print("/"); Serial2.println(conf.firstIF - conf.usbCarrier); 
-      si5351bx_setfreq(2, conf.firstIF + f);
-      }
+    if (conf.cwMode) { si5351bx_setfreq(2, conf.firstIF  + f + conf.sideTone);  }
+    else             { si5351bx_setfreq(2, conf.firstIF + f);    }
     si5351bx_setfreq(1, conf.firstIF - conf.usbCarrier);
-  }
-  conf.frequency = f;
+    }
+  conf.frequency=f;
+  byte findedIndex = getIndexHambanBbyFreq(f);
+  if (findedIndex == -1) 
+    {
+    conf.actualBand=99;
+    }
+    { 
+    conf.actualBand=f;
+    conf.freqbyband[findedIndex][conf.vfoActive==VFO_A?0:1]=f; 
+    }   
   saveconf();
 }
-
-
-/* This is the most frequently called function that configures the 
- * radio to a particular frequeny, sideband and sets up the transmit filters
- * The transmit filter relays are powered up only during the tx so they dont
- * draw any current during rx. 
- * The carrier oscillator of the detector/modulator is permanently fixed at
- * uppper sideband. The sideband selection is done by placing the second oscillator
- * either 12 Mhz below or above the 45 Mhz signal thereby inverting the sidebands 
- * through mixing of the second local oscillator. */
- 
-
-/**void setFrequency(unsigned long f){
-  // ajusta freq. al paso definido
-  f = (f / conf.arTuneStep[conf.tuneStepIndex -1]) * conf.arTuneStep[conf.tuneStepIndex -1];
-  setTXFilters(f);
-  unsigned long appliedCarrier = ((conf.cwMode == 0 ? conf.usbCarrier : conf.cwmCarrier) + (isIFShift && (inTx == 0) ? conf.ifShiftValue : 0));
-  int appliedTuneValue = 0;
-  //applied if tune 
-  //byte advancedFreqOption1;     //255 : Bit0: use IFTune_Value, Bit1 : use Stored enabled SDR Mode, Bit2 : dynamic sdr frequency0, Bit3 : dynamic sdr frequency1, bit 7: IFTune_Value Reverse for DIY uBITX
-  if ((conf.advancedFreqOption1 & 0x01) != 0x00)
-    {
-    appliedTuneValue = conf.if1TuneValue;
-    //In the LSB state, the optimum reception value was found. To apply to USB, 3Khz decrease is required.
-    if (conf.sdrModeOn && (inTx == 0))
-      appliedTuneValue -= 15; //decrease 1.55Khz
-    //if (isUSB)
-    if (conf.cwMode == 2 || (conf.cwMode == 0 && (conf.isUSB)))    
-      appliedTuneValue -= 30; //decrease 3Khz
-    }
-
-   //if1Tune RX, TX Enabled, ATT : only RX Mode
-   //The IF Tune shall be measured at the LSB. Then, move the 3Khz down for USB.
-  long if1AdjustValue = ((inTx == 0) ? (conf.attLevel * 100) : 0) + (appliedTuneValue * 100); //if1Tune RX, TX Enabled, ATT : only RX Mode  //5600
-
-  //for DIY uBITX (custom filter)
-  if ((conf.advancedFreqOption1 & 0x80) != 0x00)  //Reverse IF Tune (- Value for DIY uBITX)
-    if1AdjustValue *= -1;
-  if (conf.sdrModeOn && (inTx == 0))  //IF SDR MODE
-    {
-    Serial2.println("sdrModeOn");  
-    //Fixed Frequency SDR (Default Frequency : 32Mhz, available change sdr Frequency by uBITX Manager)
-    //Dynamic Frequency is for SWL without cat
-
-    //byte advancedFreqOption1;     //255 : Bit0: use IFTune_Value, Bit1 : use Stored enabled SDR Mode, Bit2 : dynamic sdr frequency0, Bit3 : dynamic sdr frequency1, bit 7: IFTune_Value Reverse for DIY uBITX
-    long moveFrequency = 0;
-    //7 6 5 4 3 2 1 0
-    //        _ _     <-- SDR Freuqncy Option
-    byte sdrOption = (conf.advancedFreqOption1 >> 2) & 0x03;
-
-    if (sdrOption == 1) // SDR Frequency + frequenc
-      {
-      //example : offset Freq : 20 Mhz and frequency = 7.080 => 27.080 Mhz
-      //example : offset Freq : 0 Mhz and frequency = 7.080 => 7.080 Mhz
-      //for available HF, SDR
-      moveFrequency = f;
-      }
-    else if (sdrOption == 2)  //Mhz move
-      {
-      //Offset Frequency + Mhz, 
-      //Example : Offset Frequency : 30Mhz and current Frequncy is 7.080 => 37.080Mhz
-      //          Offset Frequency : 30Mhz and current Frequncy is 14.074 => 34.074Mhz
-      moveFrequency = (f % 10000000);
-      }
-    else if (sdrOption == 3)  //Khz move
-      {
-      //Offset Frequency + Khz, 
-      //Example : Offset Frequency : 30Mhz and current Frequncy is 7.080 => 30.080Mhz
-      //          Offset Frequency : 30Mhz and current Frequncy is 14.074 => 30.074Mhz
-      moveFrequency = (f % 1000000);
-      }
-
-    si5351bx_setfreq(2, 45002000 + if1AdjustValue + f);
-    si5351bx_setfreq(1, 45002000 
-      + if1AdjustValue 
-      + conf.SDR_Center_Freq 
-      //+ ((advancedFreqOption1 & 0x04) == 0x00 ? 0 : (f % 10000000))
-      + moveFrequency);
-      // + 2390);  //RTL-SDR Frequency Error, Do not add another SDR because the error is different. V1.3
-    }
-  else
-    {
-    if (conf.cwMode == 1 || (conf.cwMode == 0 && (!conf.isUSB))) //cwl or lsb
-      {
-      //CWL(cwMode == 1) or LSB (cwMode == 0 && (!isUSB))
-      Serial2.print("SECOND_OSC_LSB/if1AdjustValue/appliedCarrier/f:"); 
-      Serial2.print(SECOND_OSC_LSB); Serial2.print("/");  
-      Serial2.print(if1AdjustValue);  Serial2.print("/");  
-      Serial2.print(appliedCarrier); Serial2.print("/");   
-      Serial2.println(f);  
-      Serial2.print("clk2/clk1:");  Serial2.print(SECOND_OSC_LSB + if1AdjustValue + appliedCarrier + f); 
-      Serial2.print("/");  Serial2.println(SECOND_OSC_LSB + if1AdjustValue);  
-      si5351bx_setfreq(2, SECOND_OSC_LSB + if1AdjustValue + appliedCarrier + f);
-      si5351bx_setfreq(1, SECOND_OSC_LSB + if1AdjustValue);
-      }
-    else  //cwu or usb
-      {
-      //CWU (cwMode == 2) or USB (cwMode == 0 and isUSB)
-      Serial2.print("SECOND_OSC_USB/if1AdjustValue/appliedCarrier/f:"); 
-      Serial2.print(SECOND_OSC_USB); Serial2.print("/");  
-      Serial2.print(if1AdjustValue);  Serial2.print("/");  
-      Serial2.print(appliedCarrier); Serial2.print("/");   
-      Serial2.println(f);  
-      Serial2.print("clk2/clk1:");  Serial2.print(SECOND_OSC_USB + if1AdjustValue - appliedCarrier + f); 
-      Serial2.print("/");  Serial2.println(SECOND_OSC_USB + if1AdjustValue);  
-      si5351bx_setfreq(2, SECOND_OSC_USB + if1AdjustValue - appliedCarrier + f);
-      si5351bx_setfreq(1, SECOND_OSC_USB + if1AdjustValue);
-      }
-    }
-  conf.frequency = f;
-}
-**/
 
 /* startTx is called by the PTT, cw keyer and CAT protocol to
  * put the uBitx in tx mode. It takes care of rit settings, sideband settings
@@ -528,7 +376,10 @@ void startTx(byte txMode, byte isDisplayUpdate){
     return;
     }
   if ((isTxType & 0x01) != 0x01)
-    digitalWrite(TX_RX, 1);
+    {
+    Serial2.println("TX ON");
+    // digitalWrite(TX_RX, 1);
+    }
   inTx = 1;
   
   if (conf.ritOn){
@@ -592,7 +443,8 @@ void startTx(byte txMode, byte isDisplayUpdate){
 
 void stopTx(void){
   inTx = 0;
-  digitalWrite(TX_RX, 0);           //turn off the tx
+  Serial2.println("TX OFF");
+  // digitalWrite(TX_RX, 0);           //turn off the tx
   SetCarrierFreq();
   if (conf.ritOn)
     setFrequency(conf.ritRxFrequency);
@@ -617,16 +469,17 @@ void stopTx(void){
 }
 
 void ritEnable(unsigned long f){
-  conf.ritOn = 1;
-  conf.ritTxFrequency = f;
+  if (conf.ritOn==0){
+    conf.ritOn = 1;
+    conf.ritTxFrequency = f;
+    }
 }
 
 void ritDisable(){
-  if (conf.ritOn){
+  if (conf.ritOn==1){
     conf.ritOn = 0;
     setFrequency(conf.ritTxFrequency);
-    updateDisplay(true,false);
-  }
+    }
 }
 
 /** Basic User Interface Routines. These check the front panel for any activity */
@@ -638,13 +491,21 @@ void ritDisable(){
 
 void checkPTT(){  
   //we don't check for ptt when transmitting cw
+ /** Serial2.print("checkPTT");
+  Serial2.print("  cwTimeout:"); Serial2.print(conf.cwTimeout);
+  Serial2.print("  inTx:"); Serial2.print(inTx);
+  Serial2.print("  PTT:"); Serial2.println(digitalRead(PTT));**/
+  
   if (conf.cwTimeout > 0) return;
-  if (digitalRead(PTT) == 0 && inTx == 0){
+  if (digitalRead(PTT) == 0 && inTx == 0)
+    {
+    Serial2.println("PTT ON");
     startTx(TX_SSB, 1);  
     delay(50); //debounce the PTT
     }
   if (digitalRead(PTT) == 1 && inTx == 1)
     {
+    Serial2.println("PTT OFF");
     stopTx(); 
     }
 }
@@ -712,10 +573,9 @@ void doTuningWithThresHold(){
 //  conf.frequency += (conf.arTuneStep[conf.tuneStepIndex -1] * s);  //appield weight (s is speed) //if want need more increase size, change step size
   conf.frequency += (conf.arTuneStep[conf.tuneStepIndex] * s);  //applied weight (s is speed) //if want need more increase size, change step size
    
-  if (prev_freq < 10000000l && conf.frequency > 10000000l)
-    conf.isUSB = true;
-  if (prev_freq > 10000000l && conf.frequency < 10000000l)
-    conf.isUSB = false;
+  //if (prev_freq < 10000000 && conf.frequency > 10000000) conf.isUSB = 1;
+  //if (prev_freq > 10000000 && conf.frequency < 10000000) conf.isUSB = 0;
+  if (conf.vfoActive=VFO_A) conf.frequencyA=conf.frequency; else conf.frequencyB=conf.frequency;
   setFrequency(conf.frequency);
   displayFreq();
 }
@@ -724,13 +584,12 @@ void doTuningWithThresHold(){
 void doRIT(){
   int knob = enc_read();
   unsigned long old_freq = conf.frequency;
-
-  if (knob < 0) conf.frequency -= (conf.arTuneStep[conf.tuneStepIndex -1]);  
-  else if (knob > 0) conf.frequency += (conf.arTuneStep[conf.tuneStepIndex -1]);  
- 
+  if (conf.tuneStepIndex<6) conf.tuneStepIndex=6;  // step=100,10,1 Hz.
+  if (knob < 0) conf.frequency -= (conf.arTuneStep[conf.tuneStepIndex]);  
+  else if (knob > 0) conf.frequency += (conf.arTuneStep[conf.tuneStepIndex]);  
   if (old_freq != conf.frequency){
     setFrequency(conf.frequency);
-    updateDisplay(true,false);
+    displayFreq();
     }
 }
 
@@ -781,23 +640,22 @@ unsigned int byteToSteps(byte srcByte) {
  * variables. */
 void initSettings(){
  // readconf();
-  ////////////////////////////////////////////////////
-  // Iniciar aquí los valores de variables nuevas
+   ////////////////////////////////////////////////////
+   // Iniciar aquí los valores de variables nuevas
 
-  // hasta aquí los valores de variables nuevas
-  ////////////////////////////////////////////////////
- // showSettings();
- // saveconf(); // para iniciar fichero
- //  showSettings();
+  // hasta aquí los valores de variables nuevas 
+   ////////////////////////////////////////////////////
+  // showSettings();
+  // Serial2.println("Reiniciando valores");
+  // saveconf(); // para iniciar fichero 
+   
   readconf();
- // showSettings();
   if (conf.cwKeyType == 0) Iambic_Key = false;
   else    
     {
     Iambic_Key = true;
     if (conf.cwKeyType == 1) keyerControl &= ~IAMBICB; else keyerControl |= IAMBICB;   
     }
-
   byte findedValidValueCount = 0;
     
   //Check Value Range and default Set for new users
@@ -920,48 +778,16 @@ void initPorts(){
   pinMode(ENC_B, INPUT_PULLUP);   // en ESP32 necesita pullup externo
   pinMode(FBUTTON, INPUT_PULLUP); // en ESP32 necesita pullup externo
   
-  pinMode(PTT, INPUT_PULLUP);
+  pinMode(PTT, INPUT_PULLUP);     // en ESP32 necesita pullup externo
   pinMode(ANALOG_KEYER, INPUT_PULLUP);
   pinMode(ANALOG_SMETER, INPUT); //by KD8CEC
 
-//  pinMode(CW_TONE, OUTPUT);  // el 6 y 7 no puede usarse en el ESP32 con WiFi
-//  digitalWrite(CW_TONE, 0);
-//  pinMode(TX_RX,OUTPUT);     // el 6 y 7 no puede usarse en el ESP32 con WiFi
-//  digitalWrite(TX_RX, 0);
-  pinMode(TX_LPF_A, OUTPUT);
-  pinMode(TX_LPF_B, OUTPUT);
-  pinMode(TX_LPF_C, OUTPUT);
-  digitalWrite(TX_LPF_A, 0);
-  digitalWrite(TX_LPF_B, 0);
-  digitalWrite(TX_LPF_C, 0);
-
-  pinMode(CW_KEY, OUTPUT);
-  digitalWrite(CW_KEY, 0);
-}
-
-//Recovery Factory Setting Values 
-void factory_Recovery()
-{
-  if (digitalRead(PTT) == 0)  //Do not proceed if PTT is pressed to prevent malfunction.
-    return;
-  printLineF(0,F("Factory Recovery"));
-  delay(2000);
-  if (!btnDown())
-    return;
-
-  printLineF(0,F("IF you continue"));
-  printLineF(1,F("release the key"));
-  delay(2000);
-  if (btnDown())
-    return;
-  
-  printLineF(1,F("Press Key PTT"));
-  delay(2000);
-  if (digitalRead(PTT) == 0)
-    {
-    printLineF(1,F("Power Reset!"));
-    while(1);   //Hold 
-    }
+  pinMode(CW_TONE, OUTPUT);    digitalWrite(CW_TONE, 0);
+  pinMode(TX_RX,OUTPUT);       digitalWrite(TX_RX, 0);
+  pinMode(TX_LPF_A, OUTPUT);   digitalWrite(TX_LPF_A, 0);
+  pinMode(TX_LPF_B, OUTPUT);   digitalWrite(TX_LPF_B, 0);
+  pinMode(TX_LPF_C, OUTPUT);   digitalWrite(TX_LPF_C, 0);
+  pinMode(CW_KEY, OUTPUT);     digitalWrite(CW_KEY, 0);
 }
 
 void initWiFi() {
@@ -984,18 +810,18 @@ void initWiFi() {
 
   if((conf.wifimode==0) || (conf.wifimode==2) || (conf.wifimode==12)) { // STA o AP+STA
     Serial2.print("Static IP:");Serial2.println(conf.staticIP?"YES":"NO");
-    if(conf.staticIP == 1) {
-      WiFi.config(conf.EEip, conf.EEgw, conf.EEmask, conf.EEdns, conf.EEdns2);
-    }
+    if(conf.staticIP == 1) { WiFi.config(conf.EEip, conf.EEgw, conf.EEmask, conf.EEdns, conf.EEdns2); }
     for(byte i=0; i<4; i++) {Serial2.print(conf.EEip[i]); Serial2.print(".");}
     WiFi.begin(conf.ssidSTA, conf.passSTA, true);
     byte cont = 0;
     Serial2.println();
-    Serial2.print("Conectando ");  Serial2.print(conf.ssidSTA);
+    Serial2.print("Conectando:");  Serial2.print(conf.ssidSTA);
     Serial2.print("/");  Serial2.print(conf.passSTA);
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    tft.drawString("Conectando:",0,180);  tft.drawString(conf.ssidSTA,140,180);
     while((!WiFi.isConnected()) && (cont++ < 20))  { delay(500); Serial2.print("."); }
+    tft.drawString("                          ",0,180);
     Serial2.println();
-    
     Serial2.print("STA IP: ");  Serial2.println(WiFi.localIP());
     Serial2.print("STA MAC: ");  Serial2.println(WiFi.macAddress());
     Serial2.print("Subnet Mask: ");  Serial2.println(WiFi.subnetMask());
@@ -1034,6 +860,7 @@ void setup()
 {
   TFT_Init();
   Serial2.begin(115200, SERIAL_8N2, RXD2, TXD2);   // Init TFT
+  Serial2.println();
   DisplayVersionInfo(FIRMWARE_VERSION_INFO);
   Init_Cat(38400, SERIAL_8N1);    Serial2.println("Init_Cat");
   initSPIFSS(false,true);  Serial2.println("initSPIFSS");
@@ -1048,8 +875,6 @@ void setup()
   else {
     Serial2.print("uBITX v0.20");  Serial2.println(conf.userCallsignLength);
     }
-  if (btnDown())    {
-    factory_Recovery();  Serial2.println("FACTORY RECOVERY BOOT");    }
   byteToMode(conf.vfoA_mode, 0);  Serial2.println("byteToMode");
   initOscillators();  Serial2.println("initOscillators");
   conf.frequency = conf.vfoA;
@@ -1060,11 +885,15 @@ void setup()
   if (btnDown())    {
     factory_alignment();    Serial2.println("ENABLE_FACTORYALIGN");   }
 #endif
-  initWiFi();
-  initFTP();
-  initHTML();
-  initTime();
-  initWebserver();
+  if (conf.autoWiFi) 
+    {
+    initWiFi();
+    initFTP();
+    initHTML();
+    initTime();
+    initWebserver();
+    checkMyIP();
+    }
   Serial2.println("END SETUP");  Serial2.println("----------------------------");
 }
 
@@ -1096,25 +925,33 @@ void task1() {
   tini=millis();
   countfaulttime++;   // si se hace mayor que TempDesactPrg,desactiva ejecucion programas dependientes de fecha
   displayStatus();
-//  procesaeventos();
-  // procesaTimeMax();
-
-/**  if(conf.modofi==0)    // normal
-    {
-    } 
-  else if(conf.modofi==2)  // radio
-    { 
-    procesaTF(); 
-    if (tftpage<7) drawTFT();
-    }**/
   mact1=millis();
+  if (digitalRead(CW_TONE)==0)
+    {
+    digitalWrite(CW_TONE, 1);
+    digitalWrite(TX_RX, 1);
+    digitalWrite(TX_LPF_A, 1);
+    digitalWrite(TX_LPF_B, 1);
+    digitalWrite(TX_LPF_C, 1);
+    digitalWrite(CW_KEY, 1);
+    }
+  else
+    {
+    digitalWrite(CW_TONE, 0);
+    digitalWrite(TX_RX, 0);
+    digitalWrite(TX_LPF_A, 0);
+    digitalWrite(TX_LPF_B, 0);
+    digitalWrite(TX_LPF_C, 0);
+    digitalWrite(CW_KEY, 0);
+    }
 }
 
 void loop(){ 
   handleFTP();
   handleWebclient();
-  if (isCWAutoMode == 0){  //when CW AutoKey Mode, disable this process
-    if (!txCAT) { checkPTT(); }  
+  if (isCWAutoMode == 0)    //when CW AutoKey Mode, disable this process
+    {
+    if ((!txCAT) && (!txTFT)) { checkPTT(); }  
     checkButton(); 
     handletfttouch();
     }
@@ -1132,7 +969,7 @@ void loop(){
       if (isCWAutoMode == 0 || cwAutoDialType == 1)
         {
         if (conf.ritOn) {  doRIT();    }
-        else { doTuningWithThresHold();   }
+        else if (!inEntN) { doTuningWithThresHold();   }
         }
       if (isCWAutoMode == 0 && beforeIdle_ProcessTime < millis() - 250) {
         idle_process();     

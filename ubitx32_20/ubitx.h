@@ -57,7 +57,7 @@
  * ground and +5v lines available on the connector. This implments the tuning mechanism
  */
 // for ESP32
-#define A0 34
+//#define A0 34
 #define A1 35
 #define A2 36
 #define A3 39
@@ -65,7 +65,7 @@
 //#define A6 39
 //#define A7 39
 
-#define ENC_A         (A0)
+#define ENC_A         (34)
 #define ENC_B         (A1)
 #define FBUTTON       (A2)
 #define PTT           (A3)
@@ -85,11 +85,11 @@
  *  - TX_RX line : Switches between Transmit and Receive after sensing the PTT or the morse keyer
  *  - CW_KEY line : turns on the carrier for CW
  */
-#define TX_RX         (7)   //Relay el 7 no puede usarse en el ESP32 con WiFi
-#define CW_TONE       (6)   // el 6 no puede usarse en el ESP32 con WiFi
-#define TX_LPF_A      (5)   //Relay
-#define TX_LPF_B      (4)   //Relay
-#define TX_LPF_C      (3)   //Relay
+#define TX_RX         (23)  //Relay
+#define CW_TONE       (16) 
+#define TX_LPF_A      (25)   //Relay
+#define TX_LPF_B      (26)   //Relay
+#define TX_LPF_C      (27)   //Relay
 #define CW_KEY        (2)
 
 //******************************************************

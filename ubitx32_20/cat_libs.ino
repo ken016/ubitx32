@@ -180,7 +180,7 @@ void CatSetPTT(boolean isPTTOn, byte fromType)
     if (inTx)
       {
       stopTx();
-      txCAT = false;
+      txCAT = false; txTFT=false;
       }
     }
   Serial.write(ACK);

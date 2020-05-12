@@ -29,22 +29,34 @@ void clearTFT()
 }
 
 TFT_eSPI_Button btFreq[9];         // buttons frequency display
+TFT_eSPI_Button btFreqTx[9];       // buttons frequency display TX at ritOn & SplitOn
 TFT_eSPI_Button btMain[10];        // buttons main display
 TFT_eSPI_Button btNav[5];          // buttons main display
+TFT_eSPI_Button btCal[5];          // buttons Calibration display
 TFT_eSPI_Button btSet[5];          // buttons Setting display
+TFT_eSPI_Button btNet[5];          // buttons Setting Net display
 TFT_eSPI_Button btFlot[5];         // buttons flotantes
 TFT_eSPI_Button btSta[5];          // buttons Status
-TFT_eSPI_Button btYN[2];           // buttons OK / Cancel
+TFT_eSPI_Button btYN[3];           // buttons OK / Cancel / Backspace
+TFT_eSPI_Button btKey[50];        // buttons Key 0..9, A..Z & symbols
 byte btMainact[10]={0,0,0,0,0,0,0,0,0,0};
-byte btSetact[15]={1,1,0,0,0};
+byte btCalact[15]={1,1,1,0,1};
+byte btSetact[15]={1,1,1,1,1};
+byte btNetact[15]={1,1,1,1,1};
 byte btNavact[5]={1,0,0,0,1};
 byte btFlotact[5]={1,0,0,0,0};
-char btMaintext[15][8]={"RX","TX","vfo ","Band","Band","LSB","USB","CW","RIT","SPL"};
-char btSettext[5][15]={"Calibration","BFO","xxx","xxx","xxx"};
+char btMaintext[15][8]={"RX","TX","A/B","Band","Band","LSB","USB","CW","RIT","SPL"};
+char btCaltext[5][15]={"Calibration","BFO","SI5351 ADDR","xxx","Reset"};
+char btSettext[5][15]={"Language","CallSign","Latitude","Longitude","xxx"};
+char btNettext[5][15]={"Auto Connect","SSID","Password","Mode","Static IP"};
 char btNavtext[5][8]={"<","xxx","xxx","xxx",">"};
 char btFlottext[5][8]={"Ent","xxx","xxx","xxx","xxx"};
-char btYNtext[2][8]={"OK","Cancel"};
-
+char btYNtext[3][8]={"OK","Cancel","<--"};
+char btKeytext[50][2]={"0","1","2","3","4","5","6","7","8","9",
+                       "A","B","C","D","E","F","G","H","I","J",
+                       "K","L","M","N","Ñ","O","P","Q","R","S",
+                       "T","U","V","W","X","Y","Z","x","x","x",
+                       "-","=","_",".",",",";","/","(",")","x"};
 char softBuffLines[2][20 + 1];
 char softBuffSended[2][20 + 1];
 
@@ -457,12 +469,9 @@ void sendUIData(int sendType)
   }
 }
 
-void displayStatus()
+void displayTime()
 {
-  char auxc[4]="";
-  strcpy(auxc,WiFi.isConnected()?"CON":"DIS");
-  btSta[0].initButtonUL(&tft,70,220,40,20,2,WiFi.isConnected()?TFT_GREEN:TFT_RED,TFT_BLACK,auxc,2);
-  btSta[0].drawButton();
+  if (!WiFi.isConnected()) return;
   btSta[1].initButtonUL(&tft,150,220,30,20,2,TFT_BLACK,TFT_WHITE,itoa(hour(),buff,10),2);
   btSta[1].drawButton();
   btSta[2].initButtonUL(&tft,186,220,30,20,2,TFT_BLACK,TFT_WHITE,itoa(minute(),buff,10),2);
@@ -472,36 +481,62 @@ void displayStatus()
   tft.setTextSize(2);  tft.setTextColor(TFT_WHITE);
   tft.drawString(":",210,220); 
   tft.drawString(":",178,220); 
+}
 
+void displayStatus()
+{
+  if ((inEntN) || (inEntA)) return;   // entradas de teclado 
+  btSta[0].initButtonUL(&tft,65,210,50,30,2,WiFi.isConnected()?TFT_GREEN:TFT_RED,TFT_BLACK,"WiFi",1);
+  btSta[0].drawButton();
+  displayTime();
 }
 
 void displayFreq()
 {
   char freqpart[9][4]={"","","","","","","","",""};
+  char freqpartSec[9][4]={"","","","","","","","",""};
   unsigned long f=conf.frequency;
-  strcat(freqpart[0],itoa(f/100000000,buff,10));
-  strcat(freqpart[1],itoa(f/10000000 % 10,buff,10));
-  strcat(freqpart[2],itoa(f/1000000 % 10,buff,10));
-  strcat(freqpart[3],itoa(f/100000 % 10,buff,10));
-  strcat(freqpart[4],itoa(f/10000 % 10,buff,10));
-  strcat(freqpart[5],itoa(f/1000 % 10,buff,10));
-  strcat(freqpart[6],itoa(f/100 % 10,buff,10));
-  strcat(freqpart[7],itoa(f/10 % 10,buff,10));
-  strcat(freqpart[8],itoa(f/1 % 10,buff,10));
-  for (byte i=0;i<6;i++)
+  unsigned long fsec;
+  if (conf.ritOn==1)
+    fsec=conf.frequencyB;
+  else if (conf.splitOn==1)
+    fsec=conf.frequencyB;
+  for (byte i=1;i<6;i++)    // no se escribe la cifra de centena de Mhz
     {
-    btFreq[i].initButtonUL(&tft,90+26*i,75,26,40,2,TFT_BLACK,conf.tuneStepIndex==i?TFT_YELLOW:TFT_WHITE,freqpart[i],i>=6?3:4);
+    long auxL=long(pow(10,8-i));
+    strcat(freqpart[i],itoa((f/auxL)%10,buff,10));
+    strcat(freqpartSec[i],itoa((fsec/auxL)%10,buff,10));
+    btFreq[i].initButtonUL(&tft,90+26*i,70,26,40,2,TFT_BLACK,conf.tuneStepIndex==i?TFT_YELLOW:TFT_WHITE,freqpart[i],i>=6?3:4);
     btFreq[i].drawButton();
     }
   for (byte i=6;i<9;i++)
     {
-    btFreq[i].initButtonUL(&tft,126+20*i,82,20,30,2,TFT_BLACK,conf.tuneStepIndex==i?TFT_YELLOW:TFT_WHITE,freqpart[i],i>=6?3:4);
+    long auxL=long(pow(10,8-i));
+    strcat(freqpart[i],itoa((f/auxL)%10,buff,10));
+    strcat(freqpartSec[i],itoa((fsec/auxL)%10,buff,10));
+    btFreq[i].initButtonUL(&tft,126+20*i,75,20,30,2,TFT_BLACK,conf.tuneStepIndex==i?TFT_YELLOW:TFT_WHITE,freqpart[i],i>=6?3:4);
     btFreq[i].drawButton();
     }
-  tft.drawCircle(164,106,1,TFT_WHITE),
-  tft.setTextSize(2); tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK),
-  tft.drawNumber(conf.calibration,60,130);
-  tft.drawNumber(conf.usbCarrier,150,130);
+  tft.fillCircle(164,105,2,TFT_WHITE);
+  if ((conf.ritOn==1) || (conf.splitOn==1))
+    {
+    tft.setTextSize(3); tft.setTextColor(TFT_LIGHTGREY);
+    tft.drawString("TX",60,125);
+    for (byte i=1;i<6;i++)    // no se escribe la cifra de centenas de Mhz
+      {
+      btFreqTx[i].initButtonUL(&tft,90+26*i,115,26,40,2,TFT_BLACK,TFT_LIGHTGREY,freqpartSec[i],i>=6?3:4);
+      btFreqTx[i].drawButton();
+      }
+    for (byte i=6;i<9;i++)
+      {
+      btFreqTx[i].initButtonUL(&tft,126+20*i,122,20,30,2,TFT_BLACK,TFT_LIGHTGREY,freqpartSec[i],i>=6?3:4);
+      btFreqTx[i].drawButton();
+      }
+    tft.fillCircle(164,145,2,TFT_LIGHTGREY);
+    }
+  tft.setTextSize(2); tft.setTextColor(TFT_RED, TFT_BLACK);
+  byte auxf=getIndexHambanBbyFreq(f);
+  tft.drawString(((f>=conf.hamBandRange[auxf][0]*1000) && (f<=conf.hamBandRange[auxf][1]*1000))?"   ":"OUT",65,90);
 }
 
 void displayNav()
@@ -517,11 +552,32 @@ void displayNav()
 void displayYN()
 {
   // botones Yes/Cancel
-  for (byte i=0;i<2;i++)
+  for (byte i=0;i<3;i++)
     {
-    btYN[i].initButtonUL(&tft,248*i,210,60,30,2,TFT_WHITE,TFT_BLACK,btYNtext[i],2);
+    btYN[i].initButtonUL(&tft,100*i,210,90,30,2,TFT_WHITE,TFT_BLACK,btYNtext[i],2);
     btYN[i].drawButton();
     }
+}
+
+void displayCal()
+{
+  // botones setting
+  for (byte i=0;i<5;i++) if (btCalact[i]==1)
+    {
+    btCal[i].initButtonUL(&tft,0,35*i+30,160,30,2,TFT_WHITE,TFT_BLACK,btCaltext[i],2);
+    btCal[i].drawButton();
+    }
+}
+
+void displayKey()    
+{
+  clearTFT();
+  for (byte i=0;i<50;i++)
+    {
+    btKey[i].initButtonUL(&tft,31*(i%10),35+(31*int(i/10)),30,30,2,TFT_WHITE,TFT_BLACK,btKeytext[i],2);
+    btKey[i].drawButton();
+    }
+  displayYN();
 }
 
 void displaySet()
@@ -529,16 +585,42 @@ void displaySet()
   // botones setting
   for (byte i=0;i<5;i++) if (btSetact[i]==1)
     {
-    btSet[i].initButtonUL(&tft,0,40*(i+1),160,30,2,TFT_WHITE,TFT_BLACK,btSettext[i],2);
+    btSet[i].initButtonUL(&tft,0,35*i+30,160,30,2,TFT_WHITE,TFT_BLACK,btSettext[i],2);
     btSet[i].drawButton();
+    }
+}
+
+void displayNet()
+{
+  // botones setting Net
+  for (byte i=0;i<5;i++) if (btNetact[i]==1)
+    {
+    btNet[i].initButtonUL(&tft,0,35*i+30,160,30,2,TFT_WHITE,TFT_BLACK,btNettext[i],2);
+    btNet[i].drawButton();
     }
 }
 
 void displayFlot()
 {
   // botones flotantes
-  btFlot[0].initButtonUL(&tft,62*4,120,60,30,2,TFT_WHITE,TFT_BLACK,btFlottext[0],2);
+  btFlot[0].initButtonUL(&tft,0,70,60,30,2,TFT_WHITE,TFT_BLACK,btFlottext[0],2);
   btFlot[0].drawButton();
+}
+
+void displayMain()
+{
+  initButtons();
+  // botones superiores
+  for (byte i=0;i<5;i++)
+    {
+    btMain[i].initButtonUL(&tft,62*i,0,60,30,2,btMainact[i]==0?TFT_WHITE:i==1?TFT_RED:TFT_YELLOW,TFT_BLACK,btMaintext[i],2);
+    btMain[i].drawButton();
+    }
+  for (byte i=5;i<10;i++)
+    {
+    btMain[i].initButtonUL(&tft,62*(i-5),35,60,30,2,btMainact[i]==0?TFT_WHITE:TFT_YELLOW,TFT_BLACK,btMaintext[i],2);
+    btMain[i].drawButton();
+    }
 }
 
 void updateDisplay(boolean alldata, boolean freqdata) {
@@ -548,34 +630,49 @@ void updateDisplay(boolean alldata, boolean freqdata) {
       {
       if (alldata) 
         {
-        // botones superiores
-        for (byte i=0;i<5;i++)
-          {
-          btMain[i].initButtonUL(&tft,62*i,0,60,30,2,btMainact[i]==0?TFT_WHITE:TFT_YELLOW,TFT_BLACK,btMaintext[i],2);
-          btMain[i].drawButton();
-          }
-        for (byte i=5;i<10;i++)
-          {
-          btMain[i].initButtonUL(&tft,62*(i-5),35,60,30,2,btMainact[i]==0?TFT_WHITE:TFT_YELLOW,TFT_BLACK,btMaintext[i],2);
-          btMain[i].drawButton();
-          }
+        displayMain();
         displayNav();
         displayFlot();
-        displayFreq();   // frecuencia
         displayStatus();    // time, status
         }
-      else
-        {
-        displayFreq();
-        }
+      displayFreq();   // frecuencia
       }
     else if (tftpage==1)    // Setup
       {
       // data
       displaySet();
       tft.setTextColor(TFT_WHITE, TFT_BLACK);
-      tft.drawNumber(conf.calibration,210,50);
-      tft.drawNumber(conf.usbCarrier,210,80);
+      tft.drawString("Setup",0,0);
+      tft.drawString(conf.lang==0?"Español":"English",180,40);
+      tft.drawString(conf.CallSign,180,75);
+      tft.drawNumber(conf.latitud,180,110);
+      tft.drawNumber(conf.longitud,180,145);
+      displayNav();
+      displayStatus();
+      }
+    else if (tftpage==2)    // WiFi
+      {
+      // data
+      displayNet();
+      tft.setTextColor(TFT_WHITE, TFT_BLACK);
+      tft.drawString("Setup WiFi",0,0);
+      tft.drawString(conf.autoWiFi==1?"YES":"NO",180,40);
+      tft.drawString(conf.ssidSTA,180,75);
+      tft.drawString(conf.passSTA,180,110);
+      tft.drawString(conf.wifimode==0?"AP":conf.wifimode==1?"STA":"AP+STA",180,145);
+      tft.drawString(conf.staticIP==1?"YES":"NO",180,180);
+      displayNav();
+      displayStatus();
+      }
+    else if (tftpage==3)    // Calibration
+      {
+      // data
+      displayCal();
+      tft.setTextColor(TFT_WHITE, TFT_BLACK);
+      tft.drawString("Calibration",0,0);
+      tft.drawNumber(conf.calibration,180,40);
+      tft.drawNumber(conf.usbCarrier,180,75);
+      tft.drawNumber(conf.SI5351BX_ADDR,180,110);
       displayNav();
       displayStatus();
       }
@@ -718,8 +815,8 @@ void DisplayVersionInfo(const __FlashStringHelper * fwVersionInfo)
 
 void  initButtons()
 {
-  btMainact[0]=1;   // RX
-  btMainact[1]=0;   // TX
+  btMainact[0]=(inTx==0);   // RX
+  btMainact[1]=(inTx==1);   // TX
   btMainact[2]=(conf.vfoActive==VFO_B);   // Vfo A/B
   btMainact[3]=0;   // Band Down
   btMainact[4]=0;   // Band Up
@@ -735,6 +832,81 @@ void  initButtons()
   btMainact[14]=0;  // Page Up
 }
 
+long getNumberTFT()
+{
+  displayKey();
+  char auxC[20]="";
+  uint16_t x, y;
+  while (true) 
+    {
+    if (tft.getTouch(&x, &y))
+      {
+      if (tft.getRotation()==1) { y=tft.height()-y;}
+      else if (tft.getRotation()==3) { x=tft.width()-x; y=tft.height()-y;}
+      for (byte i=0; i<10; i++)    // check KeyN buttons
+        {
+        if (btKey[i].contains(x,y)) 
+          {
+          strcat(auxC, itoa(i,buff,10));
+          tft.setTextSize(4); tft.setTextColor(TFT_WHITE, TFT_BLACK);
+          tft.drawString(auxC,0,0);
+          delay(100);
+          }
+        }
+      for (byte i=0; i<3; i++)    // check YN buttons
+        {
+        if (btYN[i].contains(x,y)) 
+          {
+          delay(100);
+          inEntN=false;
+          if (i==0) { return atol(auxC);   }   // OK
+          else if (i==1) { return -1; }     // Cancel
+          }
+        }
+      }
+    }
+}
+
+int getCharTFT()
+{
+  displayKey();
+  uint16_t x, y;
+  strcpy(auxtft,"");
+  while (true) 
+    {
+    if (tft.getTouch(&x, &y))
+      {
+      if (tft.getRotation()==1) { y=tft.height()-y;}
+      else if (tft.getRotation()==3) { x=tft.width()-x; y=tft.height()-y;}
+      for (byte i=0; i<50; i++)    // check KeyA buttons
+        {
+        if (btKey[i].contains(x,y)) 
+          {
+          strcat(auxtft, btKeytext[i]);
+          tft.setTextSize(4); tft.setTextColor(TFT_WHITE, TFT_BLACK);
+          tft.drawString(auxtft,0,0);
+          delay(100);
+          }
+        }
+      for (byte i=0; i<3; i++)    // check YN buttons
+        {
+        if (btYN[i].contains(x,y)) 
+          {
+          delay(100);
+          inEntN=false;
+          if (i==0) { return strlen(auxtft);   }        // OK
+          else if (i==1) { return -1; }     // Cancel
+          else if (i==2)                 // Backspace
+            { 
+            if (strlen(auxtft)>0) auxtft[strlen(auxtft)-1]=0; 
+            tft.drawString("                    ",0,0);  
+            tft.drawString(auxtft,0,0); }     
+          }
+        }
+      }
+    }
+}
+
 void handletfttouch()
 {
   uint16_t x, y;
@@ -744,18 +916,33 @@ void handletfttouch()
     else if (tft.getRotation()==3) { x=tft.width()-x; y=tft.height()-y;}
     if (tftpage==0)
       {
-      for (byte i=0; i<9; i++) { if (btFreq[i].contains(x,y)) { conf.tuneStepIndex=i; displayFreq(); } }   // check step buttons
+      for (byte i=0; i<5; i++)    // check flot buttons
+        { 
+        if (btFlot[i].contains(x,y)) 
+          {
+          if (i==0) 
+            {
+            long auxL=getNumberTFT();  // retorna con OK o Cancel
+            if (auxL!=-1) { setFrequency(auxL); }
+            }
+          updateDisplay(true,false);
+          }
+        }
+      for (byte i=0; i<9; i++)    // check step buttons
+        { if (btFreq[i].contains(x,y)) { conf.tuneStepIndex=i; displayFreq(); } }
       for (byte i=0; i<10;i++)    // check buttons function
         {
         if (btMain[i].contains(x,y)) 
           {
-          if (i==0)  {  }   // RX
-          else if (i==1)  {  }    // TX
+          if (i==0)  { stopTx(); }   // RX
+          else if (i==1)  { txTFT=true; startTx(TX_SSB,1); }    // TX
           else if (i==2)    // vfo
             {
             conf.vfoActive=conf.vfoActive==VFO_A?VFO_B:VFO_A;
             btMainact[2]=(conf.vfoActive==VFO_B);
-            strcpy(btMaintext[2],conf.vfoActive==VFO_A?"vfoA":"vfoB");
+            strcpy(btMaintext[2],conf.vfoActive==VFO_A?"A/B":"B/A");
+            if (conf.vfoActive==VFO_A) conf.frequency=conf.frequencyA;
+            else conf.frequency=conf.frequencyB;
             }
           else if (i==3) { setNextHamBandFreq(conf.frequency, -1); } //Prior Band
           else if (i==4) { setNextHamBandFreq(conf.frequency, 1); }  //Next Band
@@ -778,40 +965,113 @@ void handletfttouch()
             {
             if (conf.ritOn==1) ritDisable(); else ritEnable(conf.frequency);
             btMainact[8]=(conf.ritOn==1); 
-            Serial2.print("ritOn:"); Serial2.println(conf.ritOn);
             }
-          else if (i==9)  {  }    // SPL
+          else if (i==9)    // SPL
+            {
+            if (conf.splitOn==0) 
+              {
+              conf.splitOn=1;
+              btMainact[i]=true;
+              ritDisable();
+              }
+            else 
+              {
+              conf.splitOn=0;  
+              btMainact[i]=false;
+              }
+            }
           if (i!=1) saveconf();
           updateDisplay(true,false);
           }
         }
       }
-    else if (tftpage==1)
+    else if (tftpage==1)    // Setup page
       {
       for (byte i=0; i<5;i++)
         {
          if (btSet[i].contains(x,y)) 
            {
-           if (i==0) { setupFreq(); }   // CAL
-           else if (i==1)  { setupBFO();  }   // 
+           if (i==0) { conf.lang=conf.lang==0?1:0; }   // language
+           else if (i==1)                              // CallSign
+             { 
+             int auxI=getCharTFT(); 
+             if (auxI !=-1) { strcpy(conf.CallSign,auxtft);  }
+             }   
+           else if (i==2) {  }                         // Latitude
+           else if (i==3) {  }                         // Longitude
+           else if (i==4) {  }                         // 
+           saveconf(); updateDisplay(true,false);
+           }
+        }
+      }
+    else if (tftpage==2)    // WiFi page
+      {
+      for (byte i=0; i<5;i++)
+        {
+        if (btNet[i].contains(x,y)) 
+          {
+          if (i==0)      { conf.autoWiFi=conf.autoWiFi==0?1:0;  }   // AutoConnect
+          else if (i==1) {  }                                       // SSID
+          else if (i==2) {  }                                       // Password
+          else if (i==3)                                            // WiFi Mode
+            { if (conf.wifimode<2) conf.wifimode++; else conf.wifimode=0; }   
+          else if (i==4) { conf.staticIP=conf.staticIP==0?1:0; }                                         //  Static IP
+          saveconf();  updateDisplay(true,false);
+          }
+        }
+      }
+    else if (tftpage==3)    // Calibration page
+      {
+      for (byte i=0; i<5;i++)
+        {
+         if (btCal[i].contains(x,y)) 
+           {
+           if (i==0)      { setupFreq(); }   // CAL
+           else if (i==1) { setupBFO();  }   // BFO
            else if (i==2) {  }      // 
-           else if (i==3) {  }      // band down
-           else if (i==4) {  }      // band up
+           else if (i==3) {  }      // 
+           else if (i==4) { ESP.restart(); } // Reset
            updateDisplay(true,false);
            }
         }
       }
-    for (byte i=0; i<5;i++)
+    if ((!inEntN) && (!inEntA))
       {
-       if (btNav[i].contains(x,y)) 
-         {
-         if (i==0)  { tftpage=tftpage>0?tftpage-1:1;    }
-         else if (i==1) {     }
-         else if (i==2) {     }
-         else if (i==3) {     }
-         else if (i==4) { tftpage=tftpage<1?tftpage+1:0; }
-         updateDisplay(true,false);
-         }
+      for (byte i=0; i<5;i++)     // navigation buttons
+        {
+         if (btNav[i].contains(x,y)) 
+           {
+           if (i==0)  { tftpage=tftpage>0?tftpage-1:3;    }
+           else if (i==1) {     }
+           else if (i==2) {     }
+           else if (i==3) {     }
+           else if (i==4) { tftpage=tftpage<3?tftpage+1:0; }
+           updateDisplay(true,false);
+           }
+        }
+      for (byte i=0; i<5;i++)   // buttons status line
+        {
+         if (btSta[i].contains(x,y)) 
+           {
+           if (i==0)  
+             { if (WiFi.isConnected()) WiFi.disconnect();  
+               else
+                 {
+                 initWiFi();
+                 initFTP();
+                 initHTML();
+                 initTime();
+                 initWebserver();
+                 checkMyIP();
+                 }
+             }
+           else if (i==1) {     }
+           else if (i==2) {     }
+           else if (i==3) {     }
+           else if (i==4) {     }
+           updateDisplay(true,false);
+           }
+        }
       }
     } 
 }

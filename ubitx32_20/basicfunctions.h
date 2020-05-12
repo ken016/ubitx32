@@ -148,11 +148,11 @@ void ICACHE_FLASH_ATTR tictac(int pin, int n, int delayed)
   { for (int i=0;i<n;i++) 
     {digitalWrite(pin,1); delay(delayed); digitalWrite(pin, 0); delay(delayed);} }
 
-void ICACHE_FLASH_ATTR printconceros(int value)  {  if (value<10) Serial.print(0); Serial.print(value); }
+void ICACHE_FLASH_ATTR printconceros(int value)  {  if (value<10) Serial2.print(0); Serial2.print(value); }
 
 void ICACHE_FLASH_ATTR printhora() {
-  printconceros(hour()); Serial.print(dp);
-  printconceros(minute()); Serial.print(dp);
+  printconceros(hour()); Serial2.print(dp);
+  printconceros(minute()); Serial2.print(dp);
   printconceros(second());  
   }
 
@@ -172,7 +172,7 @@ void ICACHE_FLASH_ATTR saveconf()
   if (auxfile) { auxfile.write(buffconf,sizeof(conf)); auxfile.close();  }
 }
 
-void ICACHE_FLASH_ATTR printlinea(PGM_P texto) { for (byte i=0;i<20;i++) Serial.print(texto);Serial.println(); }
+void ICACHE_FLASH_ATTR printlinea(PGM_P texto) { for (byte i=0;i<20;i++) Serial2.print(texto);Serial2.println(); }
 
 void calcindices(int i)
 {
@@ -196,7 +196,7 @@ int callhttpGET(char *host, int port, boolean readresp, unsigned long timeout)
 }
 
 boolean checkfile(char* namefile)
-{  if (!SPIFFS.exists(namefile)) { Serial.print(namefile); Serial.println(" no existe"); return false; }  return true; }
+{  if (!SPIFFS.exists(namefile)) { Serial2.print(namefile); Serial2.println(" no existe"); return false; }  return true; }
 
 boolean checkfiles()
 {
@@ -358,6 +358,7 @@ void writeMenu(byte opcprin, byte opcsec)
   else if (opcprin==3) // CONFIGURACIÓN
     {
     printOpc(false, opcsec==0, t(dispositivo), sdhtm);
+    printOpc(false, opcsec==2, t(bandas), sbhtm);
     printOpc(false, opcsec==3, t(tred), snehtm);
     printOpc(false, opcsec==4, t(servred), snshtm);
     printOpc(false, opcsec==1, c(senales), siohtm);
