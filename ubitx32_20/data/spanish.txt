@@ -52,7 +52,7 @@ Mes
 Modo                                    
 Mostrar códigos                         
 NO                                      
-No hacer nada                           
+Bandas                                  
 Nombre                                  
 Notif.                                  
 Notificación IFTTT                      
