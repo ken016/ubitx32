@@ -1,4 +1,3 @@
-
 ///////////////////////////////////////////////////////////////////////////////
 /* Raduino needs to keep track of current state of the transceiver. These are a few variables that do it */
   typedef struct {    // datos configuración
@@ -14,16 +13,16 @@
                   unsigned int cwSpeed = 100; //this is actuall the dot period in milliseconds
                   unsigned long cwTimeout = 0;    //milliseconds to go before the cw transmit line is released and the radio goes back to rx mode
                   byte ritOn = 0;
-                  byte advancedFreqOption1;     //255 : Bit0: use IFTune_Value, Bit1 : use Stored enabled SDR Mode, Bit2~Bit3 : dynamic sdr frequency,  bit 7: IFTune_Value Reverse for DIY uBITX
+                  byte cwModeA=0;     // 0: no CW, 1: CW mode
+                  byte cwModeB=0;     // 0: no CW, 1: CW mode
                   byte attLevel = 0;            //ATT : RF Gain Control (Receive) <-- IF1 Shift, 0 : Off, ShiftValue is attLevel * 100; attLevel 150 = 15K
-                  byte if1TuneValue = 0;        //0 : OFF, IF1 + if1TuneValue * 100; // + - 12500;
                   byte sdrModeOn = 0;           //SDR MODE ON / OFF
-                  unsigned long SDR_Center_Freq; //
-                  byte vfoActive = VFO_A;
-                  byte vfoA_mode = 0;          //0: default, 1:not use, 2:LSB, 3:USB, 4:CW, 5:AM, 6:FM
-                  byte vfoB_mode = 0;          //0: default, 1:not use, 2:LSB, 3:USB, 4:CW, 5:AM, 6:FM
-                  unsigned long vfoA=7150000L;
-                  unsigned long vfoB=14200000L;
+                  unsigned long LIBRE3; // NO USADO, LIBRE
+                  byte vfoActive=VFO_A;
+                  byte isUSBA=0;        //0:LSB, 1:USB
+                  byte isUSBB=1;        //0:LSB, 1:USB
+                  unsigned long LIBRE8=0;  // NO USADO, LIBRE
+                  unsigned long LIBRE9=0;  // NO USADO, LIBRE
                   unsigned long sideTone=800;
                   byte cwDelayTime = 60;
                   byte delayBeforeCWStartTime = 50;
@@ -31,10 +30,10 @@
                   byte cwKeyType = 0; //0: straight, 1 : iambica, 2: iambicb
                   byte tuneStepIndex=6; //default Value 6, start Offset is 0 because of check new user
                   byte commonOption0 = 0;   //0: Confirm : CW Frequency Shift,  1 : IF Shift Save
-                  byte displayOption1 = 0;
-                  byte displayOption2 = 0;
+                  byte LIBRE4 = 0;  // NO USADO, LIBRE
+                  byte LIBRE5 = 0;  // NO USADO, LIBRE
                   byte useHamBandCount = 0;  //0 use full range frequency
-                  byte tuneTXType = 0;   //0 : use full range, 1 : just Change Dial speed, 2 : just ham band change, but can general band by tune, 3 : only ham band (just support 0, 2 (0.26 version))
+                  byte tuneTXType = 100; //0 : use full range, 1 : just Change Dial speed, 2 : just ham band change, but can general band by tune, 3 : only ham band (just support 0, 2 (0.26 version))
                                          //100 : use full range but not TX on general band, 101 : just change dial speed but.. 2 : jut... but.. 3 : only ham band  (just support 100, 102 (0.26 version))
                   byte isShiftDisplayCWFreq = 1;  //Display Frequency 
                   unsigned int hamBandRange[MAX_BANDS][2]=    // =  //Khz because reduce use memory
@@ -43,16 +42,16 @@
                   long freqbyband[MAX_BANDS][2]={{1810000,1810000},{3500000,3500000},{5351000,5351000},{7000000,7000000},{10100000,10100000},
                                                  {14000000,14000000},{18068000,18068000},{21000000,21000000},{24890000,24890000},{28000000,28000000}};
                   char hamBandName[MAX_BANDS][4]={"160","80","60","40","30","20","17","15","12","10"};
-                  long LIBRE[5]={10,50,100,500,1000};
+                  long LIBRE6[5]={0,0,0,000,0};
                   int ifShiftValue = 0;   //
                   byte sMeterLevels[9];
-                  byte KeyValues[16][3];
+                  byte LIBRE7[16][3];  // NO USADO, LIBRE
                   byte userCallsignLength = 0;    //7 : display callsign at system startup, 6~0 : callsign length (range : 1~18)
                   char CallSign[20]="EA4GZI";
                   byte WsprMSGCount = 0;
-                  unsigned long frequency=7150000;  //frequency is the current frequency on the dial
-                  unsigned long frequencyA=7150000;  //frequency is the current frequency VFOA
-                  unsigned long frequencyB=7150000;  //frequency is the current frequency VFOB
+                  unsigned long frequency=7150000;     // frequency is the current frequency on the dial
+                  unsigned long frequencyA=7150000L;   // frequency is the current frequency VFOA
+                  unsigned long frequencyB=14200000L;  // frequency is the current frequency VFOB
                   unsigned long ritRxFrequency=7150000;  
                   unsigned long ritTxFrequency=7150000;  
                   byte scaledSMeter = 0;
@@ -76,7 +75,7 @@
                   long arTuneStep[9]={100000000,10000000,1000000,100000,10000,1000,100,10,1};
                   float latitud=0.0;
                   float longitud=0.0;
-                  byte lang=0;                      // 0=español, 1=inglés
+                  byte lang=0;                      // 0=español, 1=inglés, 2=francés, 3=alemán
                   byte rstper=0;   
                   byte usepassDev=0;                // 1 byte, 0 no usar password,  1 usar password
                   uint8_t probecode[maxTemp][8];            // código de sonda 
@@ -115,10 +114,6 @@
 } mtype;
     mtype m;
     byte *buffm = (byte *) &m; // acceder a mem como bytes
-
-boolean inEntN=false;
-boolean inEntA=false;
-
 
 //////  tratamiento de bits /////////////////////
 const byte tab[8] = {1,2,4,8,16,32,64,128}; // 8
@@ -272,12 +267,12 @@ char filedash[]="/dash.txt";**/
 char flecha[4][3]={"<","<<",">>",">"};
 byte tftpage=0;
 byte tftapactual=0;
+byte scanF=0;   // 1: UP, 2: down
+byte keylock=0; // bloqueo teclado y botones
 
 int testvalue=0;
 unsigned long tini=0;
 String sinput="";
 ////////////////////////////////////////
 const byte maxbt817=2;
-
-///////////////// variables bomba de calor
 

@@ -132,7 +132,7 @@ void CatGetFreqMode(unsigned long freq) //for remove warning messages
   //Mode Check
   if (conf.cwMode == 0)
     {
-    CAT_BUFF[4]=conf.isUSB?CAT_MODE_USB:CAT_MODE_LSB;
+    CAT_BUFF[4]=conf.isUSB==1?CAT_MODE_USB:CAT_MODE_LSB;
     }
   else if (conf.cwMode == 1)
     {
@@ -189,7 +189,7 @@ void CatSetPTT(boolean isPTTOn, byte fromType)
 void CatVFOToggle(boolean isSendACK, byte fromType)
 {
   if (fromType != 2 && fromType != 3) {
-    menuVfoToggle(1);
+    //menuVfoToggle(1);
     }  
   if (isSendACK)
     Serial.write(ACK);  //Time 
@@ -210,12 +210,12 @@ void CatSetMode(byte tmpMode, byte fromType)
     else if (tmpMode == CAT_MODE_USB)
       {
       conf.cwMode = 0;
-      conf.isUSB = true;
+      conf.isUSB = 1;
       }
     else
       {
       conf.cwMode = 0;
-      conf.isUSB = false;
+      conf.isUSB = 0;
       }
 
     setFrequency(conf.frequency);
@@ -400,7 +400,7 @@ void ReadEEPRom_FT817(void) //for remove warnings
     case 0x78 :
       if (conf.cwMode == 0)
       {
-        if (conf.isUSB)
+        if (conf.isUSB==1)
           CAT_BUFF[0] = CAT_MODE_USB;
         else
           CAT_BUFF[0] = CAT_MODE_LSB;
@@ -535,7 +535,6 @@ void WriteEEPRom_FT817(byte fromType)
         saveconf();
         delay(300);                   //If timeout errors occur in the calling software, remove them
         clearLine2();
-        line2DisplayStatus = 0;
         }
       break;
 
@@ -758,29 +757,6 @@ void Check_Cat(byte fromType)
   //reference : http://www.ka7oei.com/ft817_meow.html
   switch(CAT_BUFF[4])
     {
-      //The stability has not been verified and there seems to be no need. so i remarked codes,
-      //if you need, unmark lines
-    /*
-      case 0x00 :   //Lock On
-        if (isDialLock == 1)  //This command returns 00 if it was unlocked, and F0 if already locked.
-          CAT_BUFF[0] = 0xF0; 
-        else {
-          CAT_BUFF[0] = 0x00; 
-          setDialLock(1, fromType);
-        }
-        Serial.write(CAT_BUFF[0]);  //Time 
-        break;
-      case 0x80 :   //Lock Off
-        if (isDialLock == 0)  //This command returns 00 if the '817 was already locked, and F0 (HEX) if already unlocked.
-          CAT_BUFF[0] = 0xF0; 
-        else {
-          CAT_BUFF[0] = 0x00; 
-          setDialLock(0, fromType);
-        }
-        Serial.write(CAT_BUFF[0]);  //Time 
-        break;
-     */
-
     case 0x01 : CatSetFreq(fromType); break;  //Set Frequency
     case 0x02 : //Split On
     case 0x82 : CatSetSplit(CAT_BUFF[4] == 0x02); break; //Split Off

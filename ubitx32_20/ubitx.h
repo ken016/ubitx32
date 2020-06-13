@@ -57,7 +57,7 @@
  * ground and +5v lines available on the connector. This implments the tuning mechanism
  */
 // for ESP32
-//#define A0 34
+#define A0 34
 #define A1 35
 #define A2 36
 #define A3 39
@@ -65,16 +65,15 @@
 //#define A6 39
 //#define A7 39
 
-#define ENC_A         (34)
+#define ENC_A         (A0)
 #define ENC_B         (A1)
 #define FBUTTON       (A2)
 #define PTT           (A3)
-#define ANALOG_KEYER  (A6)
-#define ANALOG_SPARE  (A7)
+#define ANALOG_KEYER  (4)
+//#define ANALOG_KEYER  (A6)
 #define ANALOG_SMETER (A7)  //by KD8CEC 
-#define RXD2 22  // UART2   //EA4GZI
-#define TXD2 32  // UART2   //EA4GZI
-
+#define RXD2 22             // UART2   //EA4GZI
+#define TXD2 32             // UART2   //EA4GZI
 
 /** 
  *  The second set of 16 pins on the Raduino's bottom connector are have the three clock outputs and the digital lines to control the rig.
@@ -85,11 +84,11 @@
  *  - TX_RX line : Switches between Transmit and Receive after sensing the PTT or the morse keyer
  *  - CW_KEY line : turns on the carrier for CW
  */
-#define TX_RX         (23)  //Relay
+#define TX_RX         (23)   // Relay
 #define CW_TONE       (16) 
-#define TX_LPF_A      (25)   //Relay
-#define TX_LPF_B      (26)   //Relay
-#define TX_LPF_C      (27)   //Relay
+#define TX_LPF_A      (25)   // Relay, azul
+#define TX_LPF_B      (26)   // Relay, verde
+#define TX_LPF_C      (27)   // Relay, marrón
 #define CW_KEY        (2)
 
 //******************************************************

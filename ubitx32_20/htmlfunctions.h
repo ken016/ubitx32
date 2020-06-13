@@ -318,14 +318,36 @@ void printTime()
   if (second()<10) printP(cero); printI(second());
 }
 
+void HtmlGetStateData(byte ind)    // 
+{
+  printP(td);
+  if (ind==0) printP("VFO");
+  else if (ind==1) printP("Mode");
+  else if (ind==2) printP("CW");
+  else if (ind==3) printP("RIT");
+  else if (ind==4) printP("Split");
+  else if (ind==5) printP("Freq. A");
+  else if (ind==6) printP("Freq. B");
+  else if (ind==7) printP("Freq. actual");
+  printP(td_f,td);
+  if (ind==0) printP(conf.vfoActive==VFO_A?"A":"B");
+  else if (ind==1) printP(conf.isUSB==1?"USB":"LSB");
+  else if (ind==2) printP(conf.cwMode>=1?"ON":"OFF");
+  else if (ind==3) printP(conf.ritOn>=1?"ON":"OFF");
+  else if (ind==4) printP(conf.splitOn>=1?"ON":"OFF");
+  else if (ind==5) printL(conf.frequencyA);
+  else if (ind==6) printL(conf.frequencyB);
+  else if (ind==7) printL(conf.frequency);
+  printP(td_f,td,td_f);
+}
+
 void ICACHE_FLASH_ATTR HtmlGetStateTime()
 {
   printColspan(3);
   printTime();
-  printP(b, c(PRG), b);
-  printI(ESP.getFreeHeap());
   printP(td_f);
 }
+
 
 char* ICACHE_FLASH_ATTR textonoff(float valor)
 { if (valor==1) return "ON"; else return "OFF";  }
@@ -414,15 +436,47 @@ void panelHTML() {
   /////////////  CONTENIDO   ///////////
   printColspan(3);
   printP("uBitx", td_f, tr_f);
-  printP(tr,td,"VFO",td_f,td); printP(conf.vfoActive==VFO_A?"A":"B"); printP(td_f,td,td_f, tr_f);
-  printP(tr,td,"Mode",td_f,td); printP(conf.isUSB==1?"USB":"LSB"); printP(td_f,td,td_f, tr_f);
-  printP(tr,td,"CW",td_f,td); printP(conf.cwMode>=1?"ON":"OFF"); printP(td_f,td,td_f, tr_f);
-  printP(tr,td,"RIT",td_f,td); printP(conf.ritOn>=1?"ON":"OFF"); printP(td_f,td,td_f, tr_f);
-  printP(tr,td,"SPL",td_f,td); printP(conf.splitOn>=1?"ON":"OFF"); printP(td_f,td,td_f, tr_f);
-  printP(tr,td,td_f,td); printP("VFO A",td_f, td,"VFO B",td_f,tr_f);
-  printP(tr,td,"Frequency",td_f,td); 
-  printI(conf.frequencyA); printP(td_f,td);
-  printI(conf.frequencyB); printP(td_f,tr_f);
+
+  printP(menor,letrat,letrar,b);  printP(c(tid),ig,comilla,letral);
+  printI(0);  printP(comilla,mayor);
+  HtmlGetStateData(0);
+  printP(tr_f);
+  
+  printP(menor,letrat,letrar,b);  printP(c(tid),ig,comilla,letral);
+  printI(1);  printP(comilla,mayor);
+  HtmlGetStateData(1);
+  printP(tr_f);
+  
+  printP(menor,letrat,letrar,b);  printP(c(tid),ig,comilla,letral);
+  printI(2);  printP(comilla,mayor);
+  HtmlGetStateData(2);
+  printP(tr_f);
+  
+  printP(menor,letrat,letrar,b);  printP(c(tid),ig,comilla,letral);
+  printI(3);  printP(comilla,mayor);
+  HtmlGetStateData(3);
+  printP(tr_f);
+  
+  printP(menor,letrat,letrar,b);  printP(c(tid),ig,comilla,letral);
+  printI(4);  printP(comilla,mayor);
+  HtmlGetStateData(4);
+  printP(tr_f);
+  
+  printP(menor,letrat,letrar,b);  printP(c(tid),ig,comilla,letral);
+  printI(5);  printP(comilla,mayor);
+  HtmlGetStateData(5);
+  printP(tr_f);
+  
+  printP(menor,letrat,letrar,b);  printP(c(tid),ig,comilla,letral);
+  printI(6);  printP(comilla,mayor);
+  HtmlGetStateData(6);
+  printP(tr_f);
+  
+  printP(menor,letrat,letrar,b);  printP(c(tid),ig,comilla,letraf);
+  printI(7);  printP(comilla,mayor);
+  HtmlGetStateData(7);
+  printP(tr_f);
+ 
   for (byte i=0;i<MAX_BANDS;i++)
     {
     printP(tr,td,"Band ",conf.hamBandName[i],b);
@@ -881,9 +935,8 @@ void ICACHE_FLASH_ATTR scanapHTML()
   writeHeader(false,false);
   printP(menor,table, b);
   printP(c(tclass), ig, tnormal, mayor);
-
   for (int i=0; i<nAP; i++)
-  {
+    {
     WiFi.SSID(i).toCharArray(auxchar, 20);
     printP(tr, td);
     printP(href_i, syhtm,interr,letran,ig);
@@ -892,7 +945,7 @@ void ICACHE_FLASH_ATTR scanapHTML()
     printP(auxchar, td_f, td);
     printI(WiFi.RSSI(i));
     printP(b, c(dbm), td_f, tr_f);
-  }
+    }
   printP(menor, barra, table, mayor);  
   printP(c(body_f), menor, barra);
   printP(thtml, mayor);
@@ -1057,6 +1110,25 @@ void ICACHE_FLASH_ATTR resetHTML()
   serversend200();
 }
 
+void handleStateTime() { msg=vacio; HtmlGetStateTime(); serversend200();  }
+void handleStateData0() { msg=vacio; HtmlGetStateData(0); serversend200(); }
+void handleStateData1() { msg=vacio; HtmlGetStateData(1); serversend200(); }
+void handleStateData2() { msg=vacio; HtmlGetStateData(2); serversend200(); }
+void handleStateData3() { msg=vacio; HtmlGetStateData(3); serversend200(); }
+void handleStateData4() { msg=vacio; HtmlGetStateData(4); serversend200(); }
+void handleStateData5() { msg=vacio; HtmlGetStateData(5); serversend200(); }
+void handleStateData6() { msg=vacio; HtmlGetStateData(6); serversend200(); }
+void handleStateData7() { msg=vacio; HtmlGetStateData(7); serversend200(); }
+
+void handleStateDataf0() { msg=vacio; HtmlGetStateData(0); serversend200(); }
+void handleStateDataf1() { msg=vacio; HtmlGetStateData(1); serversend200(); }
+void handleStateDataf2() { msg=vacio; HtmlGetStateData(2); serversend200(); }
+void handleStateDataf3() { msg=vacio; HtmlGetStateData(3); serversend200(); }
+void handleStateDataf4() { msg=vacio; HtmlGetStateData(4); serversend200(); }
+void handleStateDataf5() { msg=vacio; HtmlGetStateData(5); serversend200(); }
+void handleStateDataf6() { msg=vacio; HtmlGetStateData(6); serversend200(); }
+void handleStateDataf7() { msg=vacio; HtmlGetStateData(7); serversend200(); }
+
 void initHTML()
 {
   server.onNotFound (htmlNotFound);
@@ -1101,78 +1173,25 @@ void initHTML()
   server.on("/swc", setupWebCallHTML);
   server.on("/t", termostatoHTML);
   server.on("/v", voicecommandHTML);
+  **/
   
-  server.on("/l0", handleState0In);     // Entrada digital 0
-  server.on("/l1", handleState1In);     // Entrada digital 1
-  server.on("/l2", handleState2In);     // Entrada digital 2
-  server.on("/l3", handleState3In);     // Entrada digital 3
-  server.on("/l4", handleState0Out);    // Salida digital 0
-  server.on("/l5", handleState1Out);    // Salida digital 1
-  server.on("/l6", handleState2Out);    // Salida digital 2
-  server.on("/l7", handleState3Out);    // Salida digital 3
-  server.on("/l8", handleState4Out);    // Salida digital 4
-  server.on("/l9", handleState5Out);    // Salida digital 5
-  server.on("/l10", handleState6Out);   // Salida digital 6
-  server.on("/l11", handleState7Out);   // Salida digital 7
-
-  server.on("/gi0", handleState0Ing);     // Entrada digital gpio 0
-  server.on("/gi1", handleState1Ing);     // Entrada digital gpio 1
-  server.on("/gi2", handleState2Ing);     // Entrada digital gpio 2
-  server.on("/gi3", handleState3Ing);     // Entrada digital gpio 3
-  server.on("/gi4", handleState4Ing);     // Entrada digital gpio 4
-  server.on("/gi5", handleState5Ing);     // Entrada digital gpio 5
-  server.on("/gi6", handleState6Ing);     // Entrada digital gpio 6
-  server.on("/gi7", handleState7Ing);     // Entrada digital gpio 7
-  server.on("/gi8", handleState8Ing);     // Entrada digital gpio 8
-  server.on("/gi9", handleState9Ing);     // Entrada digital gpio 9
-
-  server.on("/go0", handleState0Outg);     // Salida digital gpio 0
-  server.on("/go1", handleState1Outg);     // Salida digital gpio 1
-  server.on("/go2", handleState2Outg);     // Salida digital gpio 2
-  server.on("/go3", handleState3Outg);     // Salida digital gpio 3
-  server.on("/go4", handleState4Outg);     // Salida digital gpio 4
-  server.on("/go5", handleState5Outg);     // Salida digital gpio 5
-  server.on("/go6", handleState6Outg);     // Salida digital gpio 6
-  server.on("/go7", handleState7Outg);     // Salida digital gpio 7
-  server.on("/go8", handleState8Outg);     // Salida digital gpio 8
-  server.on("/go9", handleState9Outg);     // Salida digital gpio 9
+  server.on("/l0", handleStateData0);       // data
+  server.on("/l1", handleStateData1);       // data
+  server.on("/l2", handleStateData2);       // data
+  server.on("/l3", handleStateData3);       // data
+  server.on("/l4", handleStateData4);       // data
+  server.on("/l5", handleStateData5);       // data
+  server.on("/l6", handleStateData6);       // data
+  server.on("/l7", handleStateData7);       // data
   
-  server.on("/r0", handleStater0);
-  server.on("/r1", handleStater1);
-  server.on("/r2", handleStater2);
-  server.on("/r3", handleStater3);
-  server.on("/r4", handleStater4);
-  server.on("/r5", handleStater5);
-  server.on("/r6", handleStater6);
-  server.on("/r7", handleStater7);
-  server.on("/r8", handleStater8);
-  server.on("/r9", handleStater9);
-  server.on("/r10", handleStater10);
-  server.on("/r11", handleStater11);
-  server.on("/r12", handleStater12);
-  server.on("/r13", handleStater13);
-  server.on("/r14", handleStater14);
-  server.on("/r15", handleStater15);
-  
-  server.on("/te0", handleStateTemp0);       // temperaturas
-  server.on("/te1", handleStateTemp1);       // temperaturas
-  server.on("/te2", handleStateTemp2);       // temperaturas
-  server.on("/te3", handleStateTemp3);       // temperaturas
-  server.on("/te4", handleStateTemp4);       // temperaturas
-  server.on("/te5", handleStateTemp5);       // temperaturas
-  server.on("/te6", handleStateTemp6);       // temperaturas
-  server.on("/te7", handleStateTemp7);       // temperaturas
+  server.on("/f0", handleStateDataf0);       // data fast
+  server.on("/f1", handleStateDataf1);       // data fast
+  server.on("/f2", handleStateDataf2);       // data fast
+  server.on("/f3", handleStateDataf3);       // data fast
+  server.on("/f4", handleStateDataf4);       // data fast
+  server.on("/f5", handleStateDataf5);       // data fast
+  server.on("/f6", handleStateDataf6);       // data fast
+  server.on("/f7", handleStateDataf7);       // data fast
 
-  server.on("/ge0", handleStateTemp0g);       // temperaturas
-  server.on("/ge1", handleStateTemp1g);       // temperaturas
-  server.on("/ge2", handleStateTemp2g);       // temperaturas
-  server.on("/ge3", handleStateTemp3g);       // temperaturas
-  server.on("/ge4", handleStateTemp4g);       // temperaturas
-  server.on("/ge5", handleStateTemp5g);       // temperaturas
-  server.on("/ge6", handleStateTemp6g);       // temperaturas
-  server.on("/ge7", handleStateTemp7g);       // temperaturas
-  server.on("/ge8", handleStateTemp8g);       // temperaturas
-  server.on("/ge9", handleStateTemp9g);       // temperaturas
-
-  server.on("/tt", handleStateTime);       // Pie*/
+  server.on("/tt", handleStateTime);         // Pie
 }

@@ -69,17 +69,11 @@ void cwKeydown(){
   conf.cwTimeout = millis() + conf.cwDelayTime * 10;  
 }
 
-void tone(byte pin, unsigned int freq) {  delay(1); }
+void tone(byte pin, unsigned int freq) {  delay(1); } // generar tono de freq en el pin
+void noTone(byte pin)  {  delay(1); }                 // parar tono en el pin
 
-void noTone(byte pin)
-{
-  delay(1);  
-}
-
-/**
- * Stops the cw carrier transmission along with the sidetone
- * Pushes the cwTimeout further into the future
- */
+/** Stops the cw carrier transmission along with the sidetone
+ * Pushes the cwTimeout further into the future   */
 void cwKeyUp(){
   keyDown = 0;    //tracks the CW_KEY
   noTone(CW_TONE);
@@ -113,14 +107,14 @@ char update_PaddleLatch(byte isUpdateKeyState) {
   else if (paddle >= cwAdcBothFrom && paddle <= cwAdcBothTo)
     tmpKeyerControl |= (DAH_L | DIT_L) ;     
   else 
-  {
+    {
     if (Iambic_Key)
       tmpKeyerControl = 0 ;
     else if (paddle >= cwAdcSTFrom && paddle <= cwAdcSTTo)
       tmpKeyerControl = DIT_L ;
      else
        tmpKeyerControl = 0 ; 
-  }
+    }
   
   if (isUpdateKeyState == 1)
     keyerControl |= tmpKeyerControl;
@@ -133,11 +127,11 @@ char update_PaddleLatch(byte isUpdateKeyState) {
 // modified by KD8CEC
 ******************************************************************************/
 void cwKeyer(void){
-  lastPaddle = 0;
+  lastPaddle=0;
   bool continue_loop = true;
   unsigned tmpKeyControl = 0;
-  
-  if( Iambic_Key ) {
+  if( Iambic_Key ) 
+    {
     while(continue_loop) {
       switch (keyerState) {
         case IDLE:
@@ -154,7 +148,6 @@ void cwKeyer(void){
             continue_loop = false;
           }
           break;
-    
         case CHK_DIT:
           if (keyerControl & DIT_L) {
             keyerControl |= DIT_PROC;
@@ -164,7 +157,6 @@ void cwKeyer(void){
             keyerState = CHK_DAH;
           }
           break;
-    
         case CHK_DAH:
           if (keyerControl & DAH_L) {
             ktimer = conf.cwSpeed*3;
@@ -173,7 +165,6 @@ void cwKeyer(void){
             keyerState = IDLE;
           }
           break;
-    
         case KEYED_PREP:
           //modified KD8CEC
           /*
@@ -200,10 +191,8 @@ void cwKeyer(void){
           ktimer += millis(); // set ktimer to interval end time
           keyerControl &= ~(DIT_L + DAH_L); // clear both paddle latch bits
           keyerState = KEYED; // next state
-          
           cwKeydown();
           break;
-    
         case KEYED:
           if (millis() > ktimer) { // are we at end of key down ?
            cwKeyUp();
@@ -213,9 +202,7 @@ void cwKeyer(void){
             update_PaddleLatch(1); // early paddle latch in Iambic B mode
           }
           break;
-    
-        case INTER_ELEMENT:
-          // Insert time between dits/dahs
+        case INTER_ELEMENT:   // Insert time between dits/dahs
           update_PaddleLatch(1); // latch paddle state
           if (millis() > ktimer) { // are we at end of inter-space ?
             if (keyerControl & DIT_PROC) { // was it a dit or dah ?
@@ -231,45 +218,39 @@ void cwKeyer(void){
   
       Check_Cat(2);
     } //end of while
-  }
-  else{
-    while(1){
-      if (update_PaddleLatch(0) == DIT_L) {
+    }
+  else      // not Iambic_Key
+    {
+    while(1)
+      {
+      if (update_PaddleLatch(0) == DIT_L) 
+        {
         // if we are here, it is only because the key is pressed
-        if (!inTx){
+        if (!inTx)
+          {
           //DelayTime Option
           delay_background(conf.delayBeforeCWStartTime * 2, 2);
-          
           keyDown = 0;
           conf.cwTimeout = millis() + conf.cwDelayTime * 10;  //+ CW_TIMEOUT; 
           startTx(TX_CW, 1);
-        }
+          }
         cwKeydown();
-        
-        while ( update_PaddleLatch(0) == DIT_L ) 
-          delay_background(1, 3);
-          
+        while (update_PaddleLatch(0) == DIT_L ) delay_background(1, 3);
         cwKeyUp();
-      }
-      else{
-        if (0 < conf.cwTimeout && conf.cwTimeout < millis()){
+        }
+      else
+        {
+        if (0 < conf.cwTimeout && conf.cwTimeout < millis())
+          {
           conf.cwTimeout = 0;
           keyDown = 0;
           stopTx();
-        }
-        //if (!cwTimeout) //removed by KD8CEC
-        //   return;
-        // got back to the beginning of the loop, if no further activity happens on straight key
-        // we will time out, and return out of this routine 
-        //delay(5);
-        //delay_background(5, 3); //removed by KD8CEC
-        //continue;               //removed by KD8CEC
+          }
         return;                   //Tx stop control by Main Loop
-      }
-
+        }
       Check_Cat(2);
-    } //end of while
-  }   //end of elese
+      } //end of while
+    }   //end of else
 }
 
 

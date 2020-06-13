@@ -78,7 +78,7 @@ void SendWSPRManage()
         
         printLineF(0,F("WSPR:"));
         //Display WSPR Name tag
-        printLineFromEEPRom(0, 6, wsprMessageBuffIndex, wsprMessageBuffIndex + 4, 1); 
+       // printLineFromEEPRom(0, 6, wsprMessageBuffIndex, wsprMessageBuffIndex + 4, 1); 
 
         //Load WSPR Tonecode
         //Read Tone Code
