@@ -780,6 +780,5 @@ void Check_Cat(byte fromType)
 
 void Init_Cat(long baud, int portConfig)
 {
-  Serial.begin(baud, portConfig);
-  Serial.flush();
+  Serial.begin(baud, portConfig);  Serial.flush();
 }

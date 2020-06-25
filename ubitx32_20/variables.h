@@ -1,8 +1,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 /* Raduino needs to keep track of current state of the transceiver. These are a few variables that do it */
   typedef struct {    // datos configuración
-                  boolean modeCalibrate = false;  //this mode of menus shows extended menus to calibrate the oscillators and choose the proper
-                                                  //beat frequency
+                  byte LIBRE0 = false;  
                   int32_t calibration = 180000;
                   unsigned long usbCarrier=11056000;
                   unsigned long cwmCarrier=11056000;
@@ -32,7 +31,7 @@
                   byte commonOption0 = 0;   //0: Confirm : CW Frequency Shift,  1 : IF Shift Save
                   byte LIBRE4 = 0;  // NO USADO, LIBRE
                   byte LIBRE5 = 0;  // NO USADO, LIBRE
-                  byte useHamBandCount = 0;  //0 use full range frequency
+                  byte useHamBandCount = 10;  //0 use full range frequency
                   byte tuneTXType = 100; //0 : use full range, 1 : just Change Dial speed, 2 : just ham band change, but can general band by tune, 3 : only ham band (just support 0, 2 (0.26 version))
                                          //100 : use full range but not TX on general band, 101 : just change dial speed but.. 2 : jut... but.. 3 : only ham band  (just support 100, 102 (0.26 version))
                   byte isShiftDisplayCWFreq = 1;  //Display Frequency 
@@ -72,7 +71,7 @@
                   boolean ftpenable=true;
                   int webPort=88;                   // 2 bytes, puerto servidor web
                   unsigned long firstIF = 45005000L;
-                  long arTuneStep[9]={100000000,10000000,1000000,100000,10000,1000,100,10,1};
+                  unsigned long arTuneStep[9]={100000000,10000000,1000000,100000,10000,1000,100,10,1};
                   float latitud=0.0;
                   float longitud=0.0;
                   byte lang=0;                      // 0=español, 1=inglés, 2=francés, 3=alemán
@@ -95,25 +94,35 @@
                   byte idmyjsonST=0;                // 1 byte, indica si se ha obtenido y almacenado ya la ID de myjson
                   char hostmyip[30]="icanhazip.com";// 30 bytes, URL del servidor de IP pública
                   byte actualBand=3;
-                  boolean autoWiFi=true;
+                  byte autoWiFi=0;
+                  byte scanallf=0;                  // 0: scan only ham bands, 1:scan all freq.
+                  byte TXall=0;                     // 0; TX only ham bands
+                  byte autoMode=1;                   // switch mode auto
+                  uint16_t calData[5]={0,0,0,0,0};  // calibration TFT touch
+                  byte memMode=0;                   // 0: VFO mode, 1:mem Mode
+                  int lastmempos=0;
+                  byte LIBRES[497];                 // Reservados usos futuros
+                  
 } conftype;
     conftype conf;
     byte *buffconf = (byte *) &conf; // acceder a conf como bytes
 
   typedef struct {    // datos memorias
                   byte act[maxMem];         // activa o no
-                  byte vfoact[maxMem];      // VFO 
-                  unsigned long f[maxMem];  // frequency
-                  unsigned long ftxrit[maxMem];  // frequency TX Rit
-                  char callsign[maxMem][10]; // CallSign
-                  char descr[maxMem][20];   // descripción
-                  byte isUsb[maxMem];       // mode
+                  byte vfoActive[maxMem];      // VFO 
+                  byte isUSB[maxMem];       // mode
                   byte cwMode[maxMem];      // CW mode
                   byte ritOn[maxMem];       // RIT
                   byte splitOn[maxMem];     // SPL
-} mtype;
-    mtype m;
-    byte *buffm = (byte *) &m; // acceder a mem como bytes
+                  unsigned long frequency[maxMem];  // frequency
+                  unsigned long ritTxFrequency[maxMem];  // frequency TX Rit
+                  byte isUsbspl[maxMem];         // isUSB TX split mode
+                  byte cwModespl[maxMem];        // CW mode TX split
+                  unsigned long ftxspl[maxMem];  // frequency TX Split
+                  char descr[maxMem][20];        // descripción
+} memotype;
+    memotype memo;
+    byte *buffmemo = (byte *) &memo; // acceder a mem como bytes
 
 //////  tratamiento de bits /////////////////////
 const byte tab[8] = {1,2,4,8,16,32,64,128}; // 8
@@ -184,12 +193,12 @@ float offsetAtemp[maxEA]={0.0,0.0}; // 1x4 offset conversión analógicas locale
 
 byte MbC8ant[2]={0,0};           // estado anterior de SD y ED: 0:SD0, 1:SD1, 2:ED0, 3:ED1
 byte MbC8antgpio[4]={0,0,0,0};   // estado anterior de gpios configurables
-int MbR[8]={0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0};      // 0-7 Temperaturas locales
-int MbRant[10]={0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0};   // 0-7 Temperaturas locales
+int MbR[8]={0,0,0,0,0,0,0,0};      // 0-7 Temperaturas locales
+int MbRant[10]={0,0,0,0,0,0,0,0};   // 0-7 Temperaturas locales
 float MbRgpio[10]={0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0};      // 0-9 Analógicas/temperaturas gpio
 float sumMbRgpio[10]={0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0};   // valor medio de lecturas entre presentación 0-9 Analógicas gpio
 int avrcount[10]={0,0,0,0,0,0,0,0,0,0};                           // número de lecturas para la media
-long MbRantgpio[10]={0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0};    // 0-9 Analógicas gpio anteriores
+long MbRantgpio[10]={0,0,0,0,0,0,0,0,0,0};    // 0-9 Analógicas gpio anteriores
 byte iftttchange[4]={0,0,0,0};         // 0-7: salidas digitales,  8-11: entradas digitales,  16-31 Gpios como ED/SD
 char idmyjsontemp[10]="";
 boolean onescenaact=false;
@@ -245,6 +254,7 @@ char admin[]="admin";
 
 boolean filesok=false;
 char fileconf[]="/ubitx.cnf";
+char filememo[]="/ubitx.mem";
 char filecommon[]="/common.txt";
 char filespanish[]="/spanish.txt";
 char fileenglish[]="/english.txt";
@@ -269,6 +279,8 @@ byte tftpage=0;
 byte tftapactual=0;
 byte scanF=0;   // 1: UP, 2: down
 byte keylock=0; // bloqueo teclado y botones
+int mempos=0;   // posición actual de memoria
+int memlin=0;   // posición actual en la pantalla de lista de memorias
 
 int testvalue=0;
 unsigned long tini=0;

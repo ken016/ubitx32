@@ -4,9 +4,10 @@
 //    I do not want to make this Firmware users's uBITX messy with my callsign.
 //    Putting one alphabet in front of 'v' has a different meaning.
 //    So I put + in the sense that it was improved one by one based on Original Firmware.
-//    This firmware hass been gradually changed based on the original firmware created by Farhan, Jack, Jerry and others.
+//    This firmware hass been gradually changed based on the original firmware 
+//    created by Farhan, Jack, Jerry and others and KD8CEC.
   
-#define FIRMWARE_VERSION_INFO F("+v32-1.200")  
+#define FIRMWARE_VERSION_INFO F("v 0.8")  
 #define BITX
 
 /**
@@ -181,51 +182,48 @@ unsigned countloop=0;
 //-1 : not found, 0 ~ 9 : Hamband index
 byte getIndexHambanBbyFreq(unsigned long f)
 {
-  f = f / 1000;
-  for (byte i = 0; i < conf.useHamBandCount; i++)
-    if (conf.hamBandRange[i][0] <= f && f < conf.hamBandRange[i][1])
+  for (byte i = 0; i<conf.useHamBandCount; i++)
+    if ((conf.hamBandRange[i][0]*1000 <= f) && (f <= conf.hamBandRange[i][1]*1000))
       return i;
-  return -1;
+  return 99;
 }
 
 // when Band change step = just hamband,  moveDirection : 1 = next, -1 : prior
 void setNextHamBandFreq(unsigned long f, int moveDirection)
 {
   unsigned long resultFreq = 0;
-  byte loadMode = 0;
-  byte findedIndex = getIndexHambanBbyFreq(f);
-  if (findedIndex == -1) { findedIndex=3; }   //out of hamband
+  if (conf.actualBand == 99) 
+    { conf.actualBand=3; }   //out of hamband
   else if (moveDirection==1)
     {
-    if (findedIndex < conf.useHamBandCount-1)
-      findedIndex++;
+    if (conf.actualBand < conf.useHamBandCount-1)
+      conf.actualBand++;
     else
-      findedIndex=0;
+      conf.actualBand=0;
     }
   else if (moveDirection==-1)
     {
-    if (findedIndex > 0)
-      findedIndex--;
+    if (conf.actualBand > 0)
+      conf.actualBand--;
     else
-      findedIndex=conf.useHamBandCount-1;
+      conf.actualBand=conf.useHamBandCount-1;
     }
   else
-    findedIndex = -1;
-  if (findedIndex == -1) conf.actualBand=99; else conf.actualBand=findedIndex;
-  loadMode = (byte)(resultFreq >> 29);
+    conf.actualBand = 99;
   resultFreq = resultFreq & 0x1FFFFFFF;
-  if ((resultFreq / 1000) < conf.hamBandRange[(unsigned char)findedIndex][0] || (resultFreq / 1000) > conf.hamBandRange[(unsigned char)findedIndex][1])
-    resultFreq = (unsigned long)(conf.hamBandRange[(unsigned char)findedIndex][0]) * 1000;
-  conf.isUSB=resultFreq>=10000000?1:0;
+  if ((resultFreq / 1000) < conf.hamBandRange[conf.actualBand][0] || (resultFreq / 1000) > conf.hamBandRange[conf.actualBand][1])
+    resultFreq = (unsigned long)(conf.hamBandRange[conf.actualBand][0]) * 1000;
+  if (conf.autoMode==1)
+    {
+    conf.isUSB=resultFreq>=10000000?1:0;
+    if (conf.vfoActive=VFO_A) conf.isUSBA=conf.isUSB; else conf.isUSBB=conf.isUSB;
+    }
   if (conf.actualBand != 99)
     setFrequency(conf.freqbyband[conf.actualBand][conf.vfoActive==VFO_A?0:1]);
   else
     setFrequency(resultFreq);
   saveconf();
 }
-
-void saveBandFreqByIndex(unsigned long f, unsigned long mode, char bandIndex) 
-{ if (bandIndex >= 0) saveconf(); }
 
 /*KD8CEC
   When using the basic delay of the Arduino, the program freezes.
@@ -310,18 +308,23 @@ void setFrequency(unsigned long f){
     si5351bx_setfreq(1, conf.firstIF - conf.usbCarrier);
     }
   conf.frequency=f;
-  byte findedIndex = getIndexHambanBbyFreq(f);
-  if (findedIndex == -1) 
-    {
-    conf.actualBand=99;
-    }
-  else
-    { 
-    conf.actualBand=f;
-    conf.freqbyband[findedIndex][conf.vfoActive==VFO_A?0:1]=f; 
-    }  
+  conf.actualBand=getIndexHambanBbyFreq(f);
+  if (conf.actualBand != 99) 
+    conf.freqbyband[conf.actualBand][conf.vfoActive==VFO_A?0:1]=f; 
   if (conf.vfoActive==VFO_A) conf.frequencyA=f; else conf.frequencyB=f;  
   saveconf();
+}
+
+void tftErrormsg(char *texto1, char *texto2, char *texto3)
+{
+  clearTFT();
+  tft.setTextSize(4); tft.setTextColor(TFT_RED);
+  tft.drawString(texto1,30,90);
+  tft.setTextSize(2); tft.setTextColor(TFT_YELLOW);
+  tft.drawString(texto2,0,170);
+  tft.setTextSize(2); tft.setTextColor(TFT_YELLOW);
+  tft.drawString(texto3,0,200);
+  delay(2000);
 }
 
 /* startTx is called by the PTT, cw keyer and CAT protocol to
@@ -368,14 +371,13 @@ void startTx(byte txMode, byte isDisplayUpdate){
       }
     } //end of else
   byte auxf=getIndexHambanBbyFreq(auxfreq);
-  if ((auxfreq<conf.hamBandRange[auxf][0]*1000) || (auxfreq>conf.hamBandRange[auxf][1]*1000)) 
-    {
-    clearTFT();
-    tft.setTextSize(4); tft.setTextColor(TFT_RED);
-    tft.drawString("OUT OF BAND",30,90);
-    delay(1000);
-    return;
-    } 
+  if (conf.TXall==0)    // TX only ham bands
+    if ((auxfreq<conf.hamBandRange[auxf][0]*1000) || (auxfreq>conf.hamBandRange[auxf][1]*1000)) 
+      {
+      tftErrormsg("OUT OF BAND","Modify parameter","TX range");
+      tftpage=5;
+      return;
+      } 
   if ((isTxType & 0x01) != 0x01)
     {
     digitalWrite(TX_RX, 1);
@@ -484,10 +486,20 @@ byte lastMovedirection = 0;     //0 : stop, 1 : cw, 2 : ccw
 
 void doScanF()
 {
-  if (scanF==1)
+  if (scanF==1)   // down
+    {
     conf.frequency -= (conf.arTuneStep[conf.tuneStepIndex]);
-  else
+    if (conf.scanallf==0)
+      if (conf.frequency<conf.hamBandRange[conf.actualBand][0]*1000)
+        conf.frequency=conf.hamBandRange[conf.actualBand][1]*1000;
+    }
+  else if (scanF==2)     // up
+    {
     conf.frequency += (conf.arTuneStep[conf.tuneStepIndex]);
+    if (conf.scanallf==0)
+      if (conf.frequency>conf.hamBandRange[conf.actualBand][1]*1000)
+        conf.frequency = conf.hamBandRange[conf.actualBand][0]*1000;
+    }
   setFrequency(conf.frequency);
   displayFreq();
 }
@@ -514,6 +526,52 @@ void setCWMode(byte cwmode)
   conf.cwMode=cwmode;
   if (conf.vfoActive==VFO_A) conf.cwModeA=conf.cwMode; else conf.cwModeB=conf.cwMode;
   saveconf(); 
+}
+
+void saveVFOtoMem()   
+{
+  int i=0;
+  while ((i<maxMem) && (memo.act[i]==1)) i++;
+  if (i<maxMem)
+    {
+    strcpy(memo.descr[i], itoa(conf.frequency,buff,10));
+    int auxI=getCharTFT(memo.descr[i],10); 
+    if (auxI !=-1) 
+      {
+      strcpy(memo.descr[i],auxtft);  
+      memo.act[i]=1;
+      memo.vfoActive[i]=conf.vfoActive;
+      memo.isUSB[i]=conf.isUSB;
+      memo.cwMode[i]=conf.cwMode;
+      memo.ritOn[i]=conf.ritOn;
+      memo.splitOn[i]=conf.splitOn;
+      memo.frequency[i]=conf.frequency;
+      memo.ritTxFrequency[i]=conf.ritOn==1?conf.ritTxFrequency:conf.frequency;
+      memo.isUsbspl[i]=conf.isUSBB;
+      memo.cwModespl[i]=conf.cwModeB;
+      memo.ftxspl[i]=conf.frequencyB;
+      savememo();
+      }
+    }
+}
+void setMEMtoVFO(int pos)
+{
+  if (memo.act[pos]==1)
+    {
+    conf.vfoActive=memo.vfoActive[pos];
+    conf.isUSB=memo.isUSB[pos];
+    conf.cwMode=memo.cwMode[pos];
+    conf.ritOn=memo.ritOn[pos];
+    conf.splitOn=memo.splitOn[pos];
+    conf.frequency=memo.frequency[pos];
+    conf.ritTxFrequency=memo.ritTxFrequency[pos];
+    conf.isUSBB=memo.isUsbspl[pos]=0;
+    conf.cwModeB=memo.cwModespl[pos]=0;
+    conf.frequencyB=memo.ftxspl[pos];
+    setFrequency(conf.frequency);
+    conf.lastmempos=pos;
+    saveconf();
+    }
 }
 
 void doTuningWithThresHold(){
@@ -546,6 +604,41 @@ void doTuningWithThresHold(){
   displayFreq();
 }
 
+boolean firstmem=false;
+
+void doMem()
+{
+  if (getBtnStatus()==1) 
+    {
+    if (memo.act[mempos]==1)
+      {
+      tftpage=0;
+      conf.memMode=0;
+      updateDisplay(true,false);
+      return;
+      }
+    }
+  boolean cambio=false;
+  int knob = enc_read();
+  if (knob < 0) 
+    {
+    if (memlin>0) memlin--;
+    if (mempos>0) { mempos--; cambio=true; }
+    }
+  else if (knob > 0) 
+    {
+    if (memlin<6) memlin++;
+    if (mempos<maxMem) { mempos++; cambio=true; }
+    }
+  if ((cambio) || (firstmem))
+    { 
+    firstmem=false;
+    displayMemList(); 
+    setMEMtoVFO(mempos); 
+    displayFreq();
+    }
+}
+
 /* RIT only steps back and forth by 100 hz at a time */
 void doRIT(){
   int knob = enc_read();
@@ -566,25 +659,27 @@ void doRIT(){
 
 /* The settings are read from FILE  */
 void initSettings(){
- // readconf();
-   ////////////////////////////////////////////////////
-   // Iniciar aquí los valores de variables nuevas
-
-  // hasta aquí los valores de variables nuevas 
-   ////////////////////////////////////////////////////
-  // showSettings();
-  // Serial2.println("Reiniciando valores");
-  // saveconf(); // para iniciar fichero 
-   
-  readconf();
-  // showSettings();
+  if (btnDown())
+    {
+    ////////////////////////////////////////////////////
+    SPIFFS.format();
+    Serial2.println("Reiniciando valores por defecto");
+    saveconf(); // para iniciar fichero 
+    showSettings();
+    }
+  else
+    {
+    if (!checkfiles()) Serial2.println("Falta algún fichero");
+    if(readconf()<sizeof(conf)) { saveconf(); }
+    if(readmemo()<sizeof(memo)) { savememo(); }
+    conf.memMode=0;
+    }
   if (conf.cwKeyType == 0) Iambic_Key = false;
   else    
     {
     Iambic_Key = true;
     if (conf.cwKeyType == 1) keyerControl &= ~IAMBICB; else keyerControl |= IAMBICB;   
     }
-  byte findedValidValueCount = 0;
     
   //CW Key ADC Range ======= adjust set value for reduce cw keying error
   //by KD8CEC
@@ -723,7 +818,7 @@ void initWiFi() {
     tft.setTextColor(TFT_WHITE, TFT_BLACK); tft.setTextSize(2);
     tft.drawString("Conectando:",0,180);  tft.drawString(conf.ssidSTA,140,180);
     while((!WiFi.isConnected()) && (cont++ < 20))  { delay(500); Serial2.print("."); }
-    tft.drawString("                          ",0,180);
+    tft.drawString("                     ",0,180);
     Serial2.println();
     Serial2.print("STA IP: ");  Serial2.println(WiFi.localIP());
     Serial2.print("STA MAC: ");  Serial2.println(WiFi.macAddress());
@@ -755,21 +850,30 @@ void initSPIFSS(boolean testfiles, boolean format) {
   if(testfiles) {
     File dir=SPIFFS.open("/");
     File file=dir.openNextFile();
-    while(file) { Serial2.print(file.name()); Serial2.print(b); Serial2.println(file.size()); file=dir.openNextFile(); }
+    while(file) 
+      { 
+      Serial2.print(file.name()); Serial2.print(b); 
+      Serial2.println(file.size()); 
+      file.close();
+      file=dir.openNextFile(); 
+      }
   }
 }
-
-void initSerial2(long baud) { Serial2.begin(baud, SERIAL_8N2, RXD2, TXD2);  }
+void deleteMemo()
+{
+  memset(buffmemo,0,sizeof(memo));
+  savememo(); 
+}
 
 void setup()
 {
-  TFT_Init();
+  Init_Cat(38400, SERIAL_8N1); Serial2.println("Init_Cat");
   initSerial2(115200);
+  TFT_Init();
   DisplayVersionInfo(FIRMWARE_VERSION_INFO);
-  Init_Cat(38400, SERIAL_8N1);    Serial2.println("Init_Cat");
-  initSPIFSS(false,true);  Serial2.println("initSPIFSS");
-  initSettings();  Serial2.println("initSettings");
+  initSPIFSS(true,false);  
   initPorts();     Serial2.println("initPorts");
+  initSettings();  Serial2.println("initSettings");
   initOscillators();  Serial2.println("initOscillators");
   setFrequency(conf.frequency);  
   updateDisplay(true,false);
@@ -788,9 +892,10 @@ void setup()
 void task1() {
   tini=millis();
   countfaulttime++;   // si se hace mayor que TempDesactPrg,desactiva ejecucion programas dependientes de fecha
-  if (tftpage!=103) 
+  if (tftpage!=21) 
     displayStatus(true,false);
   countloop=0;
+  if(conf.rstper>0) { if(millis() > 3600000*conf.rstper) { Serial.println("RESTART"); ESP.restart();  } }
   mact1=millis();
 }
 
@@ -801,7 +906,7 @@ void loop(){
   if (isCWAutoMode == 0)    //when CW AutoKey Mode, disable this process
     {
     if ((!txCAT) && (!txTFT)) { checkPTT(); }  
-    checkButton(); 
+    //checkButton(); 
     handletfttouch();
     }
   if (conf.cwMode!=0)
@@ -814,21 +919,28 @@ void loop(){
     {
     if (!inTx)
       {
-      if (isCWAutoMode == 0 || cwAutoDialType == 1)
+      if (conf.memMode==0)
         {
-        if (scanF>0)
+        if (isCWAutoMode == 0 || cwAutoDialType == 1)
           {
-          doScanF();  
-          }
-        else
-          {
-          if (conf.ritOn) {  doRIT();    }
-          else { doTuningWithThresHold();   }
+          if (scanF>0)
+            {
+            doScanF();  
+            }
+          else
+            {
+            if (conf.ritOn) {  doRIT();    }
+            else { doTuningWithThresHold();   }
+            }
           }
         }
       } //end of check TX Status
     //we check CAT after the encoder as it might put the radio into TX
     Check_Cat(inTx?1:0); // Serial2.println("Check_Cat");
+    }
+  else if (tftpage==22)     // Mem Mode
+    {
+    doMem(); 
     }
   if((millis() > (mact1 + 1000))) { task1(); }                      // tareas que se hacen cada segundo
 }
@@ -848,7 +960,6 @@ void showSettings()
   Serial2.print("ritOn:"); Serial2.println(conf.ritOn);
   Serial2.print("cwMode:"); Serial2.println(conf.cwMode);
   Serial2.print("cwTimeout:"); Serial2.println(conf.cwTimeout);
-  Serial2.print("modeCalibrate:"); Serial2.println(conf.modeCalibrate);
   Serial2.print("attLevel:"); Serial2.println(conf.attLevel);
   Serial2.print("sdrModeOn:"); Serial2.println(conf.sdrModeOn);
   Serial2.print("calibration:"); Serial2.println(conf.calibration);
@@ -892,6 +1003,7 @@ void showSettings()
   Serial2.print("ftpenable:"); Serial2.println(conf.ftpenable);
   Serial2.print("webPort:"); Serial2.println(conf.webPort);
   Serial2.print("firstIF:"); Serial2.println(conf.firstIF);
+  //Serial2.print("scanallf:"); Serial2.println(conf.scanallf);
   Serial2.print("arTuneStep:"); 
   for (byte i=0;i<9;i++)
     { Serial2.print(i);Serial2.print(":");Serial2.println(conf.arTuneStep[i]); Serial2.print(" "); }

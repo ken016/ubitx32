@@ -60,6 +60,7 @@ PGM_P(slkhtm)="sr";
 PGM_P(sremhtm)="ssr";
 PGM_P(sbhtm)="sb";
 PGM_P(sdhtm)="sd";
+PGM_P(smhtm)="sm";
 PGM_P(sphtm)="sp";
 PGM_P(sbphtm)="sbp";
 PGM_P(rfhtm)="rf";

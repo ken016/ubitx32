@@ -498,6 +498,171 @@ void ICACHE_FLASH_ATTR indexHTML()
   panelHTML();
   }
 
+void ICACHE_FLASH_ATTR filesHTML()
+{
+  if (!autOK()) { sendOther(loghtm,-1); return; }
+  msg=vacio;
+  writeHeader(false,false);
+  if (filesok)
+    writeMenu(4, 3);
+  else
+    printP(t(faltafichero),crlf);
+    printP(t(useftp),crlf);
+  printP(menor,table, b);
+  printP(c(tclass), ig, tnormal, mayor);
+  File dir = SPIFFS.open("/");
+  File f=dir.openNextFile("r");
+//    File dir=SPIFFS.open(barra);
+//    File file=dir.openNextFile();
+//    if (testfiles) { while (file) { Serial.print(file.name()); Serial.print(b); Serial.println(file.size()); file=dir.openNextFile(); }}
+  while (f)   {
+    printP(tr, td, href_i, comillas, letrad, letraw);
+    printP(interr, letraf, ig);
+    msg=msg+f.name();
+    printP(comillas, mayor);
+    msg=msg+f.name();
+    printP(href_f, td_f, td);
+    printI(f.size());
+    printP(td_f, tr_f);
+    f=dir.openNextFile();
+    }
+  printP(menor, barra, table, mayor);  
+  printP(c(body_f), menor, barra);
+  printP(thtml, mayor);
+  serversend200();
+}
+
+void ICACHE_FLASH_ATTR downloadHTML() {
+  File download=SPIFFS.open(server.arg(0),letrar);
+  if (download) {
+    server.sendHeader(contenttype, texttext);     // "Content-Type", "text"
+    server.sendHeader(c(contentdisposition), attachfilename+server.arg(0));    //"Content-Disposition","attachment; filename=xxxx" 
+    server.sendHeader(c(tconnection), closet);          // "Connection", "close"
+    server.streamFile(download, c(applicationoctet));  // "application/octet-stream"
+    download.close();
+  }
+}
+
+void ICACHE_FLASH_ATTR setupioHTML()
+{
+  if (!autOK()) { sendOther(loghtm,-1); return; }
+  msg=vacio;
+  mp=21;  // número de parámetros por fila
+ /** if (server.method()==HTTP_POST)
+    {
+    if ((posactio>=8) && (posactio<=11)) { setbit8(conf.iftttpinED, posactio-8,0); setbit8(conf.iftttpinED, posactio,0); }
+    if ((posactio>=12) && (posactio<=19)) { setbit8(conf.iftttpinSD, posactio-12,0); setbit8(conf.iftttpinSD, posactio-4,0); }
+    if ((posactio>=20) && (posactio<=29)) { setbit8(conf.mqttgpioenable,posactio-20,0); }
+    setbit8(conf.mqttsalenable,posactio,0);
+    for (int i=0  ;i<server.args(); i++)
+      {
+      calcindices(i);
+      if (indice<8)  // temperaturas
+        {
+        if (resto==0) { server.arg(i).toCharArray(auxdesc, 20); savedescr(filedesclocal,auxdesc,indice,20); }
+        else if (resto==1) { setbit8(conf.mqttsalenable,indice,1); }
+        else if (resto==2) { conf.setpoint[indice]=server.arg(i).toFloat();  }  // valor consigna
+        else if (resto==3) { conf.salsetpoint[indice]=server.arg(i).toInt(); }  // salida asociada
+        else if (resto==4) { conf.accsetpoint[indice]=server.arg(i).toInt(); }  // acción consigna
+        else if (resto==5)    // número y código de sonda
+          { 
+          conf.nprobe[indice]=server.arg(i).toInt();
+          for (byte j=0;j<8;j++) conf.probecode[indice][j]=addr1Wire[server.arg(i).toInt()-1][j];
+          } 
+        }
+      else if ((indice>=8) && (indice<=11)) // entradas digitales
+        {
+        if (resto==0) { server.arg(i).toCharArray(auxdesc,20); savedescr(filedesclocal, auxdesc,indice,20); }
+        else if (resto==1) { setbit8(conf.mqttsalenable,indice,1); }
+        else if (resto==5) { conf.tipoED[indice-8] = server.arg(i).toInt(); }  
+        else if (resto==6) { setbit8(conf.iftttpinED, indice-8, server.arg(i).toInt()); }   // Notificar si/no
+        else if (resto==7) { setbit8(conf.iftttpinED, indice, server.arg(i).toInt()); }  // Notificar si/no
+        }
+      else if ((indice>=12) && (indice<=19)) // salidas digitales
+        {
+        if (resto==0) { server.arg(i).toCharArray(auxdesc, 20); savedescr(filedesclocal, auxdesc, indice, 20); }
+        else if (resto==1) { setbit8(conf.mqttsalenable,indice,1); }
+        else if (resto==6) { setbit8(conf.iftttpinSD, indice-12, server.arg(i).toInt());  }   // Notificar si/no
+        else if (resto==7) { setbit8(conf.iftttpinSD, indice-4, server.arg(i).toInt());  }    // Notificar si/no
+        else if (resto==8) { conf.valinic[indice-12] = server.arg(i).toInt();  }              // valor inicial
+        else if (resto==9) { conf.tempdefact[indice-12] = server.arg(i).toInt();  }           // Seg. ON
+        else if (resto==10) { conf.tempdefdes[indice-12] = server.arg(i).toInt();  }          // Seg. OFF
+        }
+      else if ((indice>=20) && (indice<=29))  // GPIOS configurables
+        {
+        if (resto==0) { server.arg(i).toCharArray(auxdesc, 20); savedescr(filedescgpio,auxdesc,indice-20,20); }
+        else if (resto==1) { setbit8(conf.mqttgpioenable,indice-20,1); }
+        else if (resto==17) 
+          { 
+          conf.gpiosensortype[indice-20]=server.arg(i).toInt(); }
+        else if (resto==18) { conf.gpioalfa[indice-20]=server.arg(i).toFloat(); }
+        else if (resto==19) { conf.gpiobeta[indice-20]=server.arg(i).toFloat(); }
+        else if (resto==20) { conf.gpiogamma[indice-20]=server.arg(i).toFloat(); }
+        }
+      }
+    if (conf.modoterm==1) { conf.tempdefact[0]=0; conf.tempdefdes[0]=0;  }
+    memset(conf.contadoresgpio,0,sizeof(conf.contadoresgpio));// contadores de Gpios 
+    saveconf();
+    posactio++; if (posactio>20+maxgpiovar) posactio=0;
+    sendOther(siohtm,-1); return;
+    }**/
+  if (server.args() > 0) 
+    { 
+    saveconf();
+    posactio = constrain(server.arg(0).toInt(),0,22+maxgpiovar); 
+    }
+  writeHeader(false,false);
+  writeMenu(3,1);
+  writeForm(siohtm);
+  printP(tr);
+  tcell(descripcion); 
+  ccell(gpio);
+  printP(td,c(mqtt),td_f);
+  printP(td,ID,td_f);
+  tcell(consigna);
+  tcell(salida);
+  printP(td,ONOFF,td_f,tr_f);
+  for (byte i=0; i<20+maxgpiovar; i++)
+    {
+    mpi=mp*i;
+    if (i<=1) // Sondas temperatura
+      {
+      printP(tr);
+      if (posactio==i)
+        {
+        printP(td, menor, c(tinput), b, type, ig);
+        printP(comillas, c(ttext), comillas, b);
+        printP(c(namet), ig);
+        printPiP(comillas, mpi, comillas);
+        printP(b, tvalue, ig, comillas);
+        printP("sonda");
+        printP(comillas,b,c(max_length));
+        printIP(19, size_i);
+        printI(19);
+        printP(comillas, mayor, menor, barra, c(tinput), mayor);
+        printP(td_f);
+        cell(26);
+        pc(select_f);
+ //       checkBox(mpi+1,(getbit8(conf.mqttsalenable,i)),true);
+//        selectProbe(mpi+5, conf.nprobe[i], true);
+        }
+      else
+        {
+        printP(td,"sonda",td_f);
+        cell(26);
+   //     cell(getbit8(conf.mqttsalenable,i)?symyes:symnot);
+        
+        printP(td); 
+     //   printaddr1Wire(conf.nprobe[i]);
+        printP(td_f);
+        }
+      printP(tr_f);
+      }
+    printP(tr_f);
+    }
+  writeFooter(guardar, false);
+  serversend200();
+}
 
 void setupDevHTML()
 {
@@ -508,9 +673,7 @@ void setupDevHTML()
     for (int i=0; i<server.args(); i++)
       {
       calcindices(i);
-      if (param_number==0)    // callsign
-        {
-        }
+      if (param_number==0) server.arg(i).toCharArray(conf.CallSign, 20); // callsign
       else if (param_number==1) { conf.calibration = server.arg(i).toInt();  }
       else if (param_number==2) { conf.usbCarrier = server.arg(i).toInt();  }
       else if (param_number==3) { conf.latitud = server.arg(i).toFloat();  }
@@ -520,6 +683,8 @@ void setupDevHTML()
       else if (param_number==7) { conf.cwDelayTime = server.arg(i).toInt(); }
       else if (param_number==8) { conf.cwKeyType = server.arg(i).toInt(); }
       else if (param_number==9) { conf.SI5351BX_ADDR = server.arg(i).toInt(); }
+      else if (param_number==10) { conf.scanallf = server.arg(i).toInt(); }   
+      else if (param_number==11) { conf.TXall = server.arg(i).toInt(); }   
       else if (param_number==99) { conf.rstper = server.arg(i).toInt(); } // período rset automatico
       }
     saveconf();
@@ -537,8 +702,8 @@ void setupDevHTML()
   printP(td,td_f,tr_f);
 
   printP(tr,td,"Calibration/usbCarrier",td_f); 
-  printcampoL(1, conf.calibration, 10, true, true);
-  printcampoL(2,  conf.usbCarrier, 10, true, true); 
+  printcampoL(1, conf.calibration, 9, true, true);
+  printcampoL(2,  conf.usbCarrier, 9, true, true); 
 
   printP(tr, td, href_i, comillas);
   pc(thttp);
@@ -562,7 +727,14 @@ void setupDevHTML()
   printP(td,td_f);
   printP(tr,td,"SI5351BX_ADDR"); 
   printcampoI(9, conf.SI5351BX_ADDR, 5, true, true); printP(td_f,td,td_f,tr_f);
-  
+
+  printP(tr, td, "Scan mode",td_f);
+  printcampoCB(10, conf.lang, PSTR("Ham bands"), PSTR("All range"),true); 
+  printP(td_f,td,td_f,tr_f);
+
+  printP(tr, td, "TX range",td_f);
+  printcampoCB(11, conf.lang, PSTR("Ham bands"), PSTR("All range"),true); 
+  printP(td_f,td,td_f,tr_f);
 
   printP(tr, td, "Reset periodico (horas)",td_f,td);
   printcampoCB(99,conf.rstper,1,24,false); 
@@ -572,22 +744,95 @@ void setupDevHTML()
   serversend200();
 }
 
+void setupMemHTML()
+{
+  msg=vacio;
+  mp=12;
+  if (server.method()==HTTP_POST)
+    {
+    memset(memo.act,0,sizeof(memo.act));
+    memset(memo.ritOn,0,sizeof(memo.ritOn));
+    memset(memo.splitOn,0,sizeof(memo.splitOn));
+    for (int i=0; i<server.args(); i++)
+      {
+      calcindices(i);
+      if (resto==0) memo.act[indice]=server.arg(i).toInt();
+      else if (resto==1) server.arg(i).toCharArray(memo.descr[indice], 20);
+      else if (resto==2) memo.frequency[indice]=server.arg(i).toInt();
+      else if (resto==3) memo.isUSB[indice]=server.arg(i).toInt();
+      else if (resto==4) memo.cwMode[indice]=server.arg(i).toInt();
+      else if (resto==5) memo.vfoActive[indice]=server.arg(i).toInt()==0?VFO_A:VFO_B;
+      else if (resto==6) memo.ritOn[indice]=server.arg(i).toInt();
+      else if (resto==7) memo.ritTxFrequency[indice]=server.arg(i).toInt();
+      else if (resto==8) memo.splitOn[indice]=server.arg(i).toInt();
+      else if (resto==9) memo.ftxspl[indice]=server.arg(i).toInt();
+      else if (resto==10) memo.isUsbspl[indice]=server.arg(i).toInt();
+      else if (resto==11) memo.cwModespl[indice]=server.arg(i).toInt();
+      }
+    savememo();
+   // readmemo();
+    sendOther(smhtm,-1);
+    return;
+    }
+
+  writeHeader(false,false);
+  writeMenu(3,5);
+  writeForm(smhtm);
+  
+  printP(tr); printColspan(7); printP(td_f);
+  printColspan(2);  printP("RIT",td_f);
+  printColspan(4);  printP("SPLIT",td_f,tr);
+  printP(tr,td,"Canal",td_f);
+  printP(td,"Act.",td_f,td,"Descr.",td_f);
+  printP(td,"Freq.",td_f,td,"SSB mode",td_f);
+  printP(td,"CW mode",td_f,td,"VFO",td_f);
+  printP(td,"En.",td_f,td,"TX Freq.",td_f);
+  printP(td,"En.",td_f,td,"TX Freq.",td_f);
+  printP(td,"Mmode",td_f,td,"CW",td_f);
+  printP(tr_f);
+//  for (byte i=0;i<maxMem;i++)
+  for (byte i=0;i<10;i++)
+    {
+    printP(tr); printPiP(td,i+1,b); printP(td_f); 
+    printP(memo.act[i]==1?th:td);
+    checkBox(mp*i,memo.act[i],false);
+    printP(memo.act[i]?th_f:td_f);
+    printcampoC(mp*i+1, memo.descr[i], 10, true, true, false,true);
+    printcampoL(mp*i+2, memo.frequency[i], 9, true, true);
+    printcampoCB(mp*i+3, memo.isUSB[i],"LSB","USB",true);
+    printcampoCB(mp*i+4, memo.cwMode[i],"None","CW",true);
+    printcampoCB(mp*i+5, memo.vfoActive[i],"VFO A","VFO B",true);
+    printP(memo.ritOn[i]==1?th:td);
+    checkBox(mp*i+6,memo.ritOn[i],false);
+    printP(memo.ritOn[i]?th_f:td_f);
+    printcampoL(mp*i+7, memo.ritTxFrequency[i], 9, true, true);
+    printP(memo.splitOn[i]==1?th:td);
+    checkBox(mp*i+8,memo.splitOn[i],false);
+    printP(memo.splitOn[i]?th_f:td_f);
+    printcampoL(mp*i+9, memo.ftxspl[i], 9, true, true);
+    printcampoCB(mp*i+10, memo.isUsbspl[i],"LSB","USB",true);
+    printcampoCB(mp*i+11, memo.cwModespl[i],"None","CW",true);
+    printP(tr_f);  
+    }
+    
+  writeFooter(guardar, false);
+  serversend200();
+}
+
 void setupBandHTML()
 {
   msg=vacio;
-  mp=1;
+  mp=2;
   if (server.method()==HTTP_POST)
     {
     for (int i=0; i<server.args(); i++)
       {
       calcindices(i);
-      if (resto==0)
-        conf.hamBandRange[indice][0]=server.arg(i).toInt();
-      else if (resto==1)
-        conf.hamBandRange[indice][1]=server.arg(i).toInt();
+      if (resto==0)      conf.hamBandRange[indice][0]=server.arg(i).toInt();
+      else if (resto==1) conf.hamBandRange[indice][1]=server.arg(i).toInt();
       }
     saveconf();
-    readconf();
+  //  readconf();
     sendOther(sbhtm,-1);
     return;
     }
@@ -1133,13 +1378,14 @@ void initHTML()
 {
   server.onNotFound (htmlNotFound);
   initupdateserver();
- // server.on("/f", filesHTML);
  // server.on("/sy", systemHTML);
   
   /**if (!checkfiles()) { server.on("/", filesHTML); return;  }*/
+  server.on("/f", filesHTML);
   server.on("/", indexHTML);
   server.on("/p", panelHTML);
   server.on("/sd", setupDevHTML);
+  server.on("/sm", setupMemHTML);
   server.on("/sne", setupNetHTML);
   server.on("/sc", scanapHTML);
   server.on("/sns", setupNetServHTML);
@@ -1148,8 +1394,9 @@ void initHTML()
   server.on("/ss", setupSegHTML);
   server.on("/rs", resetHTML);
   server.on("/sb", setupBandHTML);
-/* server.on("/dw", downloadHTML);
-  server.on("/j", jsonHTML);
+  server.on("/sio", setupioHTML);
+ server.on("/dw", downloadHTML);
+/*  server.on("/j", jsonHTML);
   server.on("/jc", jsonconfHTML);
   server.on("/je", jsonextHTML);
   server.on("/on", onCmd);
@@ -1162,7 +1409,6 @@ void initHTML()
   server.on("/sdrio", setupDevRemioHTML);
   server.on("/se", setupEscHTML);
   server.on("/sf", setupFecHTML);
-  server.on("/sio", setupioHTML);
   server.on("/sp", setupPanelHTML);
   server.on("/spr", setupPrgHTML);
   server.on("/sr", setupremHTML);

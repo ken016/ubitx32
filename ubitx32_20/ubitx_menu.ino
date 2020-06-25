@@ -10,7 +10,7 @@ Ian KD8CEC
 
 //Commonly called functions when exiting menus by KD8CEC
 
-int getValByKnob(int valueType, int targetValue, int minValue, int maxValue, int incStep, const char* Title, int Sensitivity)
+int32_t getValByKnob(int valueType, int targetValue, int32_t minValue, int32_t maxValue, int incStep, const char* Title, int Sensitivity)
 {
     int knob;
     int moveDetectStep=0;
@@ -59,7 +59,6 @@ void menuIFSSetup(int btn){
   else 
     {
     isIFShift = 1;
-
     conf.ifShiftValue = getValByKnob(2, conf.ifShiftValue, -20000, 20000, 50, "IFS", 2); 
     delay_background(500, 0); //for check Long Press function key
     if (btnDown() || conf.ifShiftValue == 0)
@@ -94,7 +93,7 @@ void setupFreq(){
     tft.fillRect(190, 40, 160, 30, TFT_BLACK);
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
     tft.drawNumber(conf.calibration,180,40);
-    result=checkYN();
+    if (btnDown()) result=0; else result=checkYN();
     knob = enc_read();
     if (knob != 0)
       {
@@ -130,7 +129,7 @@ void setupBFO(){
     tft.fillRect(190, 70, 160, 30, TFT_BLACK);
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
     tft.drawNumber(conf.usbCarrier,180,70);
-    result=checkYN();
+    if (btnDown()) result=0; else result=checkYN();
     knob = enc_read();
     if (knob != 0)
       {
@@ -156,3 +155,4 @@ void setupBFO(){
  //this is used by the si5351 routines in the ubitx_5351 file
 //extern int32_t calibration;
 extern uint32_t si5351bx_vcoa;
+extern int enc_read(void);

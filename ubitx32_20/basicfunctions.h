@@ -163,13 +163,45 @@ int ICACHE_FLASH_ATTR readconf()
   int count=0;
   for (count=0;count<sizeof(conf);count++)*(buffconf+count)=auxfile.read();
   auxfile.close();
+  Serial2.print("Conf:");  Serial2.print(sizeof(conf));
+  Serial2.print(" leidos:"); Serial2.println(count);
   return count;
 }
 
 void ICACHE_FLASH_ATTR saveconf()
 {
   File auxfile=SPIFFS.open(fileconf, rmas);
-  if (auxfile) { auxfile.write(buffconf,sizeof(conf)); auxfile.close();  }
+  if (auxfile) 
+    { 
+    int byteswriten=auxfile.write(buffconf,sizeof(conf)); 
+    if (byteswriten!=sizeof(conf)) 
+      {
+      Serial2.print("ERROR AL GUARDAR FICHERO CONF");
+      Serial2.print(" bytes writen:"); Serial2.println(byteswriten);
+      }
+    auxfile.close();  
+    }
+}
+
+int ICACHE_FLASH_ATTR readmemo()
+{
+  File auxfile=SPIFFS.open(filememo,letrar);
+  if (!auxfile) return 0;
+  int count=0;
+  for (count=0;count<sizeof(memo);count++)*(buffmemo+count)=auxfile.read();
+  auxfile.close();
+  return count;
+}
+
+void ICACHE_FLASH_ATTR savememo()
+{
+  File auxfile=SPIFFS.open(filememo, rmas);
+  if (auxfile) 
+    { 
+    int byteswriten=auxfile.write(buffmemo,sizeof(memo)); 
+    if (byteswriten!=sizeof(memo)) Serial2.print("ERROR AL GUARDAR FICHERO memo");
+    auxfile.close();  
+    }
 }
 
 void ICACHE_FLASH_ATTR printlinea(PGM_P texto) { for (byte i=0;i<20;i++) Serial2.print(texto);Serial2.println(); }
@@ -195,6 +227,8 @@ int callhttpGET(char *host, int port, boolean readresp, unsigned long timeout)
   return httpCode;
 }
 
+void initSerial2(long baud) { Serial2.begin(baud, SERIAL_8N2, RXD2, TXD2); Serial2.flush(); }
+
 boolean checkfile(char* namefile)
 {  if (!SPIFFS.exists(namefile)) { Serial2.print(namefile); Serial2.println(" no existe"); return false; }  return true; }
 
@@ -202,6 +236,7 @@ boolean checkfiles()
 {
   boolean auxB=true;
   auxB=auxB && checkfile(fileconf); 
+  auxB=auxB && checkfile(filememo); 
 /**  auxB=auxB && checkfile(filezonas);
   auxB=auxB && checkfile(filedevrem);
   auxB=auxB && checkfile(filesalrem); 
@@ -359,6 +394,7 @@ void writeMenu(byte opcprin, byte opcsec)
     {
     printOpc(false, opcsec==0, t(dispositivo), sdhtm);
     printOpc(false, opcsec==2, t(bandas), sbhtm);
+    printOpc(false, opcsec==5, t(tmemorias), smhtm);
     printOpc(false, opcsec==3, t(tred), snehtm);
     printOpc(false, opcsec==4, t(servred), snshtm);
     printOpc(false, opcsec==1, c(senales), siohtm);

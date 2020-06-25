@@ -160,6 +160,7 @@
 #define guardarexportar 111  
 #define idioma 112  
 #define bombacalor 113  
+#define tmemorias 114
 
 //////////////////////////////////////////////////////////////////////
 ////// textos, deben coincidir con los textos del fichero common.txt
