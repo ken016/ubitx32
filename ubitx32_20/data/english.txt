@@ -111,7 +111,7 @@ Use FTP o \"Sketch Data Upload
 Save/Export                             
 Language                                
 Heat Pump                               
-                                        
+Memories                                
                                         
                                         
                                         

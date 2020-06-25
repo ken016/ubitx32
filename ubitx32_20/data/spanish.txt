@@ -111,5 +111,5 @@ Use FTP o \"Sketch Data Upload
 Guardar/Exportar                        
 Idioma                                  
 Bomba Calor                             
-                                        
+Memorias                                
                                         
